@@ -4,8 +4,8 @@ import { executeDbQuery } from "../db";
 export default class reportsController {
   private router: Router = express.Router();
 
-  constructor(private app: Application) {
-    app.use("/api/reports", this.router);
+  constructor(private app: Router) {
+    app.use("/reports", this.router);
 
     this.router.get("/AccountReport", this.AccountReport.bind(this));
     this.router.get("/AmbulanceDetails", this.AmbulanceDetails.bind(this));
@@ -47,6 +47,7 @@ export default class reportsController {
   }
 
   async BillRegisterCollectionSummary(req: Request, res: Response): Promise<void> {
+    
     const input = req.method === 'GET' ? req.query : req.body;
 
     const sql = `select TM.CLINIC_NAME,UM.USERNAME,BM.MEDRECNO,BM.BILLNO, convert(varchar(10),BM.BILLDATE,103)as BILLDATE , BM.PATFNAME AS Patientname, ISNULL( RF.REFDOCTOR_FNAME,'') AS REF_DOC ,BM.TOTALBILLAMT,BM.TOTDISCOUNT,BM.AMOUNTPAID,0 AS DUEAMOUNT,BM.RFNDAMOUNT,(BM.AMOUNTPAID-BM.RFNDAMOUNT)AS NETAMOUNT   , STUFF((SELECT '; ' + S.SERVNAME   FROM MST_SERVICES S, OPD_BILLTRN D WHERE S.SERVCODE = D.SERVCODE AND  D.BILLNO = BM.BILLNO   ORDER BY S.SERVNAME    FOR XML PATH('')), 1, 1, '') SERVNAME   from OPD_BILLMST BM left join Mst_ReferralDoctor RF on RF.RefDoct_ID = BM.REFDOCTCD   INNER JOIN Mst_UserDetails UM ON UM.USERID=BM.CREATED_BY  INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE=BM.CLNORGCODE WHERE convert(varchar(10), Bm.BILLDATE, 120)>=@FROMDATE    and convert(varchar(10), Bm.BILLDATE, 120)<=@TODATE AND BM.CREATED_BY LIKE @UserId AND BM.CLNORGCODE like @hospid ORDER BY 1,2 `;

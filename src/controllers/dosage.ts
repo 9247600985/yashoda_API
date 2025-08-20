@@ -4,8 +4,8 @@ import { executeDbQuery } from "../db";
 export default class DosageController {
   private router: Router = express.Router();
 
-  constructor(private app: Application) {
-    app.use("/api/dosage", this.router);
+  constructor(private app: Router) {
+    app.use("/dosage", this.router);
 
     this.router.get("/", this.getAll.bind(this));
     this.router.get("/byid", this.getById.bind(this));
@@ -63,7 +63,7 @@ export default class DosageController {
       if (exists) {
         res.json({ status: 1, result: "Duplicate record found. Insert aborted." });
         return;
-      }
+      } 
 
       // Insert new record
       const { rowsAffected } = await executeDbQuery(insertSql, params);

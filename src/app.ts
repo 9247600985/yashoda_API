@@ -1,6 +1,4 @@
-// app.ts
-
-import express, { Application, Request, Response, NextFunction } from "express";
+import express, { Application, Request, Response, NextFunction, Router } from "express";
 import cors from "cors";
 import DosageController from "./controllers/dosage";
 import PatientQuries from "./controllers/PatientQuries";
@@ -9,10 +7,11 @@ import { conpool } from "./db";
 import reportsController from "./controllers/reportsController";
 import mastersController from "./controllers/mastersController";
 import opController from "./controllers/opController";
+import numberGenController from "./controllers/numberGenController";
 
 const app: Application = express();
+const apiRouter: Router = Router(); // ✅ Correctly typed as Router
 
-// Enable CORS for all routes
 app.use(cors());
 
 // Optional: Fine-tune CORS if needed
@@ -28,30 +27,32 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Request Logger
+// Request logger
 app.use((req: Request, _res: Response, next: NextFunction) => {
   logInfo(`Incoming Request: ${req.method} ${req.url}`);
   next();
 });
 
-// Health check route
+// Health check
 app.get("/health", async (_req: Request, res: Response) => {
   try {
+    await conpool;
     const r = await conpool.request().query("SELECT 1 AS dbStatus");
-    logInfo("Health check passed: DB Connected");
     res.status(200).json({ status: "OK, DB Connected", dbStatus: r.recordset[0].dbStatus });
   } catch (err: any) {
-    logInfo(`Health check failed: ${err.message}`);
     res.status(500).json({ status: "FAIL", error: err.message });
   }
 });
 
-// Load API controllers
-new DosageController(app);
-new PatientQuries(app);
-new reportsController(app);
-new mastersController(app);
-new opController(app);
+new DosageController(apiRouter);
+new PatientQuries(apiRouter);
+new reportsController(apiRouter);
+new mastersController(apiRouter);
+new opController(apiRouter);
+new numberGenController(apiRouter);
+
+// Mount all API routes under /api
+app.use("/api", apiRouter);
 
 // Global error handler
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
@@ -59,7 +60,6 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ status: "error", message: err.message });
 });
 
-// Start server
 const PORT = 3000;
 app.listen(PORT, () => {
   logInfo(`Server is running on port ${PORT}`);

@@ -3,8 +3,8 @@ import { executeDbQuery } from "../db";
 export default class PatientQuries{
     private router: Router = express.Router();
 
-    constructor(private app: Application) {
-      app.use("/api/PatientQuries", this.router); 
+    constructor(private app: Router) {
+      app.use("/PatientQuries", this.router); 
       
       // this.router.get("/getOPDetailsByMobile", this.getOPDetailsById.bind(this));
       // this.router.get("/getOPPHDetailsByMobile", this.getOPPHDetailsById.bind(this));
