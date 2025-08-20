@@ -13,7 +13,7 @@ export default class opController {
   constructor(private app: Router) {
     app.use("/op", this.router);
 
-    this.router.post("/Duplicate", this.Check_Duplicate.bind(this));
+    this.router.get("/Duplicate", this.Check_Duplicate.bind(this));
     this.router.post("/PatientMaster", this.savePatientMaster.bind(this));
     this.router.post("/BillInsert", this.generateBillInsert.bind(this));
 
