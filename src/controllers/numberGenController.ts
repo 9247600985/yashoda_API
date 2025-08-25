@@ -28,7 +28,7 @@ export default class numberGenController {
                 res.json({ status: 1, result: "No number generated" });
             }
         } catch (err: any) {
-            res.json({ status: 1, result: err.message });
+            res.status(500).json({ status: 1, result: err.message });
         }
     }
 
@@ -52,7 +52,7 @@ export default class numberGenController {
             }
 
         } catch (err: any) {
-            res.json({ status: 1, result: err.message });
+            res.status(500).json({ status: 1, result: err.message });
         }
     }
 

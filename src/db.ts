@@ -1,5 +1,6 @@
+// db.ts
 import sql from "mssql";
-import { logQuery } from "./utilities/logger";
+import { logQuery, logError } from "./utilities/logger";
 
 export const config: sql.config = {
   user: "sa",
@@ -13,19 +14,25 @@ export const config: sql.config = {
   },
 };
 
+// Connection pool (shared)
 export const conpool = new sql.ConnectionPool(config);
-conpool.connect().catch(err =>
-  console.error("Pool connect error:", err.message || err)
-);
+conpool.connect().catch(err => logError(`Pool connect error: ${err.message || err}`));
 
-// Define return type
+// --- Types ---
 interface DbQueryResult {
   records: any[];
   rowsAffected: number[];
   output: Record<string, any>;
 }
 
-// Centralized query function with logging
+interface DbQueryMeta {
+  query?: string;
+  params?: any;
+  request?: sql.Request;
+  transaction?: sql.Transaction;
+}
+
+// --- Centralized query executor ---
 export async function executeDbQuery(
   query: string,
   params: Record<
@@ -37,12 +44,20 @@ export async function executeDbQuery(
         direction?: "input" | "output";
       }
   > = {},
-  meta: { query?: string; params?: any } = {}
+  meta: DbQueryMeta = {}
 ): Promise<DbQueryResult> {
   const start = Date.now();
-  const req = conpool.request();
+  let req: sql.Request;
 
-  // Handle input/output params
+  if (meta.request) {
+    req = meta.request;
+  } else if (meta.transaction) {
+    req = new sql.Request(meta.transaction);
+  } else {
+    req = conpool.request();
+  }
+
+  // Bind params
   for (const [k, v] of Object.entries(params)) {
     if (v && typeof v === "object" && "type" in v) {
       if (v.direction === "output") {
@@ -51,19 +66,20 @@ export async function executeDbQuery(
         req.input(k, v.type, v.value);
       }
     } else {
-      req.input(k, v); // fallback simple usage
+      req.input(k, v);
     }
   }
 
   try {
     const result = await req.query(query);
 
-    logQuery?.({
+    logQuery({
       query: meta.query || query,
       params: meta.params || params,
       resultCount: result.recordset?.length || 0,
       rowsAffected: result.rowsAffected || [0],
       execTime: `${Date.now() - start} ms`,
+      context: meta.transaction ? "transaction" : "pool",
     });
 
     return {
@@ -72,11 +88,12 @@ export async function executeDbQuery(
       output: result.output || {},
     };
   } catch (err: any) {
-    logQuery?.({
+    logQuery({
       query: meta.query || query,
       params: meta.params || params,
       error: err.message,
       execTime: `${Date.now() - start} ms`,
+      context: meta.transaction ? "transaction" : "pool",
     });
 
     throw err;

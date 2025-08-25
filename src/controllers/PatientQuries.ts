@@ -32,7 +32,7 @@ export default class PatientQuries{
           }
           res.json({ status: 0, result: records });
         } catch (err: any) {
-          res.json({ status: 1, result: err.message });
+          res.status(500).json({ status: 1, result: err.message });
         }
       }
       async getOPPHDetailsByMobile(req: Request, res: Response): Promise<void> {
@@ -53,7 +53,7 @@ export default class PatientQuries{
           }
           res.json({ status: 0, result: records });
         } catch (err: any) {
-          res.json({ status: 1, result: err.message });
+          res.status(500).json({ status: 1, result: err.message });
         }
       }
 
@@ -75,7 +75,7 @@ export default class PatientQuries{
             res.json({ status: 1, result: "Insert failed" });
           }
         } catch (err: any) {
-          res.json({ status: 1, result: err.message });
+          res.status(500).json({ status: 1, result: err.message });
         }
       }
 }

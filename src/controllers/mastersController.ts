@@ -22,7 +22,7 @@ export default class mastersController {
       const { records } = await executeDbQuery(sql);
       res.json({ status: 0, result: records });
     } catch (err: any) {
-      res.json({ status: 1, result: err.message });
+      res.status(500).json({ status: 1, result: err.message });
     }
   }
 
@@ -91,7 +91,7 @@ export default class mastersController {
 
       res.json({ status: 0, result: tableHTML });
     } catch (err: any) {
-      res.json({ status: 1, result: err.message });
+      res.status(500).json({ status: 1, result: err.message });
     }
   }
 
@@ -123,7 +123,7 @@ export default class mastersController {
       const { records } = await executeDbQuery(query);
       res.json({ status: 0, result: records });
     } catch (err: any) {
-      res.json({ status: 1, result: err.message });
+      res.status(500).json({ status: 1, result: err.message });
 
     }
   }
@@ -189,7 +189,7 @@ export default class mastersController {
 
       res.json({ status: 0, result: tableHTML });
     } catch (err: any) {
-      res.json({ status: 1, result: err.message });
+      res.status(500).json({ status: 1, result: err.message });
     }
   }
 

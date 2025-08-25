@@ -30,7 +30,7 @@ export default class reportsController {
       const { records } = await executeDbQuery(sql, { FromDate: input.FROMDATE, ToDate: input.TODATE, Bill_number: `%${input.Bill_number || ''}%`, Clinic_Code: `%${input.Clinic_Code || ''}%` });
       res.json({ status: 0, result: records });
     } catch (err: any) {
-      res.json({ status: 1, result: err.message });
+      res.status(500).json({ status: 1, result: err.message });
     }
   }
 
@@ -42,7 +42,7 @@ export default class reportsController {
       const { records } = await executeDbQuery(sql, { FDATE: input.FDATE, TDATE: input.TDATE, CLNORGCODE: `%${input.hospid}%` });
       res.json({ status: 0, result: records });
     } catch (err: any) {
-      res.json({ status: 1, result: err.message });
+      res.status(500).json({ status: 1, result: err.message });
     }
   }
 
@@ -55,7 +55,7 @@ export default class reportsController {
       const { records } = await executeDbQuery(sql, { FROMDATE: input.FROMDATE, TODATE: input.TODATE, UserId: `%${input.UserId}%`, hospid: `%${input.hospid}%` });
       res.json({ status: 0, result: records });
     } catch (err: any) {
-      res.json({ status: 1, result: err.message });
+      res.status(500).json({ status: 1, result: err.message });
     }
   }
 
@@ -105,7 +105,7 @@ export default class reportsController {
 
       res.json({ status: 0, result: records });
     } catch (err: any) {
-      res.json({ status: 1, result: err.message });
+      res.status(500).json({ status: 1, result: err.message });
     }
   }
 
@@ -118,7 +118,7 @@ export default class reportsController {
       const { records } = await executeDbQuery(sql, { FROMDATE: input.FROMDATE, TODATE: input.TODATE, UserId: `%${input.UserId}%`, Clinic_Code: `%${input.Clinic_Code}%`, DoctCode: `%${input.DoctCode || ''}%`, });
       res.json({ status: 0, result: records });
     } catch (err: any) {
-      res.json({ status: 1, result: err.message });
+      res.status(500).json({ status: 1, result: err.message });
     }
   }
 
@@ -157,7 +157,7 @@ export default class reportsController {
 
       res.json({ status: 0, result: records });
     } catch (err: any) {
-      res.json({ status: 1, result: err.message });
+      res.status(500).json({ status: 1, result: err.message });
     }
   }
   async ConsultationWise(req: Request, res: Response): Promise<void> {
@@ -193,7 +193,7 @@ export default class reportsController {
 
       res.json({ status: 0, result: records });
     } catch (err: any) {
-      res.json({ status: 1, result: err.message });
+      res.status(500).json({ status: 1, result: err.message });
     }
   }
 
