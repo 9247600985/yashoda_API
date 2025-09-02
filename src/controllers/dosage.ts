@@ -1,5 +1,7 @@
 import express, { Application, Request, Response, Router } from "express";
 import { executeDbQuery } from "../db";
+import { authenticateToken } from "../utilities/authMiddleWare";
+
 
 export default class DosageController {
   private router: Router = express.Router();
@@ -7,7 +9,7 @@ export default class DosageController {
   constructor(private app: Router) {
     app.use("/dosage", this.router);
 
-    this.router.get("/", this.getAll.bind(this));
+    this.router.get("/", authenticateToken, this.getAll.bind(this));
     this.router.get("/byid", this.getById.bind(this));
     this.router.post("/", this.create.bind(this));
     this.router.put("/", this.update.bind(this));

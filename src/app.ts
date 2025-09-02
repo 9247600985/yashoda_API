@@ -8,6 +8,7 @@ import opController from "./controllers/opController";
 import numberGenController from "./controllers/numberGenController";
 import { logInfo, logError } from "./utilities/logger";
 import { conpool } from "./db";
+import UserController from "./controllers/userController";
 
 const app: Application = express();
 const apiRouter: Router = Router();
@@ -38,6 +39,7 @@ app.get("/health", async (_req: Request, res: Response) => {
 });
 
 // --- Controllers ---
+new UserController(apiRouter);
 new DosageController(apiRouter);
 new PatientQuries(apiRouter);
 new reportsController(apiRouter);
