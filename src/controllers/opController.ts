@@ -12,14 +12,228 @@ export default class opController {
     this.router.get("/Duplicate", this.Check_Duplicate.bind(this));
     this.router.get("/DuplicateDoctorPatcon", this.Check_DuplicateDoctorPatcon.bind(this));
     this.router.get("/DuplicateDoctorPatcon1", this.Check_DuplicateDoctorPatcon1.bind(this));
+    this.router.get("/GetPaymentType1", this.GetPaymentType1.bind(this));
+    this.router.get("/getFessOnDoctorCode", this.getFessOnDoctorCode.bind(this));
+    this.router.get("/checkIpNo", this.checkIpNo.bind(this));
+    this.router.get("/GetDoctCode", this.GetDoctCode.bind(this));
+    this.router.get("/GetCONSBYDEPT", this.GetCONSBYDEPT.bind(this));
+    this.router.get("/getDoctorDepartment", this.getDoctorDepartment.bind(this));
+    this.router.get("/getTokenNo", this.getTokenNo.bind(this));
+    this.router.get("/getFacilityDefaultValues", this.getFacilityDefaultValues.bind(this));
+    this.router.get("/getPatientOtherDetails", this.getPatientOtherDetails.bind(this));
+    this.router.get("/GetPaymentType", this.GetPaymentType.bind(this));
+    this.router.get("/loadOPRefDocRefAgent", this.loadOPRefDocRefAgent.bind(this));
+    this.router.put("/DOCTPATCON", this.updateDOCTPATCON.bind(this));
+    this.router.put("/DOCTPATCON1", this.updateDOCTPATCON1.bind(this));
+    this.router.put("/PatientMaster", this.updatePatientMaster.bind(this));
     this.router.post("/PatientMaster", this.savePatientMaster.bind(this));
     this.router.post("/Consultation", this.saveConsultation.bind(this));
     this.router.post("/BillInsert", this.generateBillInsert.bind(this));
     this.router.post("/DOCTPATCON", this.saveDOCTPATCON.bind(this));
-    this.router.put("/DOCTPATCON", this.updateDOCTPATCON.bind(this));
-    this.router.put("/DOCTPATCON1", this.updateDOCTPATCON1.bind(this));
-    this.router.put("/PatientMaster", this.updatePatientMaster.bind(this));
 
+  }
+
+  async getFessOnDoctorCode(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    try {
+      let sql = `select NewVisit_Charge,PaidFollowUp_Charge,Emergency_Charge,SpecialConsultation_Charge ,CrossConsultation_Charge, GeneralOPD_Charge,DoctorShare_Percentage,Valid_Visits,FreeFollowUp_No,PaidFollowUp_No,IPFollowUp_Charge,IP_FollowUp_Visits,IP_FollowUp_Days from Mst_ChargeSheet_TM S `;
+
+      if (input.CHKBLSRULES && input.CHKBLSRULES.length > 0) {
+        sql += `, MST_COMPRULETRN C WHERE S.TARIFFID = C.TARIFFID`;
+      } else {
+        sql += ` WHERE 1=1`;
+      }
+
+      sql += ` AND S.TARIFFID = @tariffcd AND S.CLNORGCODE = @HospitalId AND S.COUNTRY_ID = @COUNTRY_ID`;
+
+      if (input.DOCTCODE && input.DOCTCODE.length > 0) {
+        sql += ` AND Doctor_ID = @doctcode`;
+      }
+
+      const params: any = { tariffcd: input.TARIFFID, HospitalId: input.CLNORGCODE, COUNTRY_ID: input.COUNTRY_ID, };
+
+      if (input.DOCTCODE && input.DOCTCODE.length > 0) {
+        params.doctcode = input.DOCTCODE;
+      }
+
+      const { records } = await executeDbQuery(sql, params);
+
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async getPatientOtherDetails(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const sql = ` SELECT mst.Guardian_Name, mst.Guardian_Relation, mst.Guardian_TeleCell, mst.Cr_Address1, mst.Cr_Address2, mst.Cr_Address3, mst.Cr_Pincode, mst.Cr_City, T.CityName, mst.Cr_Country, C.Country_Name, mst.Cr_State, S.State_Name, mst.Cr_District, D.District_Name, mst.Image_Name, mst.NATLCODE, mst.RELGCODE, mst.Blood_Group, mst.Marital_Status, mst.PatientType FROM Patient_Master MST LEFT JOIN Mst_Country C ON C.Country_ID = MST.Cr_Country LEFT JOIN Mst_District D ON D.District_ID = MST.Cr_District LEFT JOIN Mst_State S ON S.State_ID = MST.Cr_State LEFT JOIN Mst_City_Details T ON T.ID = MST.Cr_City WHERE PatientMr_No = @MRNO `;
+
+    const params = { MRNO: input.PatientMrNo };
+
+    try {
+      const { records } = await executeDbQuery(sql, params);
+
+      const details = records.map((dr: any) => {
+        const imgpath = dr.Image_Name || "";
+        let base64ImageRepresentation = "";
+
+        // Optional: load base64 if file exists
+        // if (imgpath) {
+        //   const imageArray = fs.readFileSync(imgpath);
+        //   base64ImageRepresentation = Buffer.from(imageArray).toString("base64");
+        // }
+
+        return {
+          guardianname: dr.Guardian_Name || "",
+          guardianrelation: dr.Guardian_Relation || "",
+          guardianmobile: dr.Guardian_TeleCell || "",
+          guardianaddress1: dr.Cr_Address1 || "",
+          guardianaddress2: dr.Cr_Address2 || "",
+          guardianaddress3: dr.Cr_Address3 || "",
+          guardianpincode: dr.Cr_Pincode || "",
+          guardiancityid: dr.Cr_City || "",
+          guardiancityname: dr.CityName || "",
+          guardiancountryid: dr.Cr_Country || "",
+          guardiancountryname: dr.Country_Name || "",
+          guardianstateid: dr.Cr_State || "",
+          guardianstatename: dr.State_Name || "",
+          guardiandistrictid: dr.Cr_District || "",
+          guardiandistrictname: dr.District_Name || "",
+          imagepath: base64ImageRepresentation
+            ? `data:image/jpeg;base64,${base64ImageRepresentation}`
+            : "",
+          imagepathhiden: imgpath,
+          Nationality: dr.NATLCODE || "",
+          Religion: dr.RELGCODE || "",
+          maritalstatus: dr.Marital_Status || "",
+          bloodgroup: dr.Blood_Group || "",
+          PatientType: dr.PatientType || ""
+        };
+      });
+
+      res.json({ status: 0, result: details });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async loadOPRefDocRefAgent(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const sql = `Select pm.ReferralDoctoragent_ID,pm.ReferralDoctor_ID,Ref_FName,RefDoctor_FName from Patient_Master pm left join Mst_ReferralDoctor mrd on mrd.RefDoct_ID=pm.ReferralDoctor_ID left join Mst_ReferralAgents mra on mra.Ref_ID=pm.ReferralDoctoragent_ID where  (pm.PatientMr_No=@MRNO or pm.PatientMr_No=@OPNO)`;
+
+    const params = { MRNO: input.mrno, OPNO: input.OPNO }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  
+  async GetPaymentType(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const sql = `select Payment_Type,* from Mst_PatientCategory where PC_Code=@PATCATGCD`;
+
+    const params = { PATCATGCD: input.PatientCategory }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async checkIpNo(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const sql = `select count(*) AS AdmittedCount from ipd_admission where status='A' and medrecno=@MRNO `;
+
+    const params = { MRNO: input.PatientMrNo }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async getFacilityDefaultValues(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const sql = ` select MST.CountryId,COALESCE(CN.Country_Name,'')Country_Name, MST.StateId,COALESCE(ST.State_Name,'') State_Name, MST.DistrictId,COALESCE(DS.District_Name ,'')District_Name, MST.CityId,MST.PC_CODE ,COALESCE(CT.CityName,'')CityName,OpBedCatId from Mst_FacilitySetup MST LEFT JOIN Mst_Country CN ON CN.Country_ID = MST.CountryId LEFT JOIN Mst_State ST ON ST.State_ID = MST.StateId LEFT JOIN Mst_District DS ON DS.District_ID=MST.DistrictId LEFT JOIN Mst_City_Details CT ON CT.ID=MST.CityId where MST.CLNORGCODE=@HOSPID`;
+
+    const params = { HOSPID: input.HospitalId }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async GetDoctCode(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    const sql = `SELECT DOCTCODE FROM OPD_CONSULTATION WHERE MEDRECNO=@MRNO AND OPDBILLNO=@BILLNO`;
+    const params = { MRNO: input.PatientMrNo, BILLNO: input.BILLNO }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async getDoctorDepartment(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    const sql = `select DEP.CLNORGCODE, Dep.DEPTCODE,Dep.DEPTNAME,Doc.serviceCode,(select OPRegFeeServcode from Mst_FacilitySetup where CLNORGCODE=@HospitalId) OPRegFeeServcode, Doc.roomno from Mst_DoctorMaster Doc, Mst_Department Dep where Doc.Department = Dep.DEPTCODE and Doc.Code=@DOCTCODE `;
+    const params = { HospitalId: input.HospitalId, DOCTCODE: input.DOCTCODE }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async getTokenNo(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    const sql = `SELECT GENTOKEN FROM OPD_DOCTTOKENNO WHERE DOCTCODE=@DOCTCD AND CLNORGCODE=@HOSPID AND CONVERT(VARCHAR(10),CONSDATE,120)=CONVERT(VARCHAR(10),GETDATE(),120) `;
+
+    const params = { DOCTCODE: input.DOCTCODE, HOSPID: input.HospitalId}
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async GetCONSBYDEPT(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    const sql = `select CONSBYDEPT from  Mst_DoctorMaster where Status='A' and code=@DOCTCD`;
+    const params = { DOCTCD: input.DOCTCODE }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async GetPaymentType1(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    const sql = ` SELECT PAYMENT_TYPE FROM MST_PATIENTCATEGORY WHERE PC_CODE=@CATGCD`;
+    const params = { CATGCD: input.CATGCD }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
   }
 
   async Check_Duplicate(req: Request, res: Response): Promise<void> {
@@ -316,7 +530,7 @@ export default class opController {
       res.status(500).json({ status: 1, message: err.message });
     }
   }
- 
+
   async saveConsultation(req: Request, res: Response): Promise<void> {
     const input = req.body;
     const pool = await conpool.connect();
@@ -609,7 +823,7 @@ export default class opController {
         LEDGPOST: input.LEDGPOST,
         POSTDATE: input.POSTDATE,
         CREATED_BY: sessionUID,
-        CREATED_ON : input.Crated_On,
+        CREATED_ON: input.Crated_On,
         EDITED_BY: input.EDITED_BY || '',
         EDITED_ON: input.EDITED_ON || '',
         CANCELDBY: input.CANCELDBY,

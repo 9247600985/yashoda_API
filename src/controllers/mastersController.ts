@@ -1,6 +1,7 @@
 import express, { Application, Request, Response, Router } from "express";
 import { executeDbQuery } from "../db";
 import { decodeBase64, IsBase64 } from "../utilities/base64Utils";
+import * as sql from "mssql";
 
 
 export default class mastersController {
@@ -13,6 +14,9 @@ export default class mastersController {
     this.router.get("/TwoField", this.TwoField.bind(this));
     this.router.get("/TwoFieldInnerJoin", this.TwoFieldInnerJoin.bind(this));
     this.router.get("/LoadDropDowns", this.LoadDropDowns.bind(this));
+    this.router.get("/GenderFromSalutation", this.getGenderFromSalutation.bind(this));
+    this.router.get("/AgeCalculation1", this.getAgeCalculation1.bind(this));
+    this.router.get("/AgeCalculation", this.getAgeCalculation.bind(this));
 
   }
 
@@ -21,6 +25,81 @@ export default class mastersController {
     try {
       const { records } = await executeDbQuery(sql);
       res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async getGenderFromSalutation(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    const sql = `SELECT COALESCE(SAL_SEX,'') GENDER FROM MST_SALUTATION WHERE SAL_CODE=@SALCODE`;
+    const params = { SALCODE: input.SalutainID }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async getAgeCalculation(req: Request, res: Response): Promise<void> {
+  const input = req.method === "GET" ? req.query : req.body;
+
+  try {
+    const spName = "USP_CALCULATEAGE";
+    const sql = `EXEC ${spName} @FromDate=@FromDate, @ToDate=@ToDate`;
+
+    const params = {
+      FromDate: input.FromDate,
+      ToDate: input.ToDate
+    };
+
+    const { records } = await executeDbQuery(sql, params);
+
+    const appointments = records.map((r: any) => ({
+      years: r.Years?.toString() ?? "",
+      Months: r.Months?.toString() ?? "",
+      Days: r.Days?.toString() ?? ""
+    }));
+
+    res.json({ status: 0, result: appointments });
+  } catch (err: any) {
+    res.status(500).json({ status: 1, result: err.message });
+  }
+}
+
+  async getAgeCalculation1(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    
+    try {
+      const sql1 = `SELECT DATEADD(YEAR, -CAST(@Years AS INT), @ToDate) AS YearDate`;
+      const params1 = {
+        Years: parseInt(input.Years, 10),
+        ToDate: new Date(input.ToDate)
+      };
+
+      const { records: records1 } = await executeDbQuery(sql1, params1);
+      const YearDate = records1[0].YearDate;
+
+      const sql2 = `SELECT DATEADD(MONTH, -CAST(@Months AS INT), @YearDate) AS MonthDate`;
+      const params2 = {
+        Months: parseInt(input.Months, 10),
+        YearDate: YearDate
+      };
+
+      const { records: records2 } = await executeDbQuery(sql2, params2);
+      const MonthDate = records2[0].MonthDate;
+
+      const sql3 = `SELECT FORMAT(DATEADD(DAY, -CAST(@Days AS INT), @MonthDate), 'dd/MM/yyyy') AS DateOfBirth `;
+      const params3 = {
+        Days: parseInt(input.Days, 10),
+        MonthDate: MonthDate
+      };
+
+      const { records: records3 } = await executeDbQuery(sql3, params3);
+      const DateOfBirth = records3[0].DateOfBirth;
+
+      res.json({ status: 0, result: DateOfBirth });
     } catch (err: any) {
       res.status(500).json({ status: 1, result: err.message });
     }
