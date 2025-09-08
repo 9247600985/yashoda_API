@@ -30,20 +30,13 @@ interface DbQueryMeta {
   params?: any;
   request?: sql.Request;
   transaction?: sql.Transaction;
+  isStoredProc?: boolean;
 }
 
 // --- Centralized query executor ---
 export async function executeDbQuery(
   query: string,
-  params: Record<
-    string,
-    | any
-    | {
-        value: any;
-        type: sql.ISqlTypeFactoryWithNoParams | sql.ISqlTypeFactoryWithLength;
-        direction?: "input" | "output";
-      }
-  > = {},
+  params: Record<string, any> = {},
   meta: DbQueryMeta = {}
 ): Promise<DbQueryResult> {
   const start = Date.now();
@@ -57,7 +50,7 @@ export async function executeDbQuery(
     req = conpool.request();
   }
 
-  // Bind params
+  // Bind parameters
   for (const [k, v] of Object.entries(params)) {
     if (v && typeof v === "object" && "type" in v) {
       if (v.direction === "output") {
@@ -71,7 +64,12 @@ export async function executeDbQuery(
   }
 
   try {
-    const result = await req.query(query);
+    let result;
+    if (meta.isStoredProc) {
+      result = await req.execute(query);  // ✅ Use execute for SP
+    } else {
+      result = await req.query(query);
+    }
 
     logQuery({
       query: meta.query || query,
@@ -95,7 +93,6 @@ export async function executeDbQuery(
       execTime: `${Date.now() - start} ms`,
       context: meta.transaction ? "transaction" : "pool",
     });
-
     throw err;
   }
 }

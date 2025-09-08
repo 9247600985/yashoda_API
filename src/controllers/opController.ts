@@ -1,6 +1,7 @@
 import express, { Application, Request, Response, Router } from "express";
 import { conpool, executeDbQuery } from "../db";
 import sql, { Numeric, query } from "mssql";
+import { VisitType, VisitTypeResponse, safeVal, PatSearchCriteria, PatientSearchObj, formatDate, safeNumber, RegistrationFee } from "./helpers";
 
 
 export default class opController {
@@ -23,6 +24,7 @@ export default class opController {
     this.router.get("/getPatientOtherDetails", this.getPatientOtherDetails.bind(this));
     this.router.get("/GetPaymentType", this.GetPaymentType.bind(this));
     this.router.get("/loadOPRefDocRefAgent", this.loadOPRefDocRefAgent.bind(this));
+    this.router.get("/GetPATTYPE", this.GetPATTYPE.bind(this));
     this.router.put("/DOCTPATCON", this.updateDOCTPATCON.bind(this));
     this.router.put("/DOCTPATCON1", this.updateDOCTPATCON1.bind(this));
     this.router.put("/PatientMaster", this.updatePatientMaster.bind(this));
@@ -30,7 +32,400 @@ export default class opController {
     this.router.post("/Consultation", this.saveConsultation.bind(this));
     this.router.post("/BillInsert", this.generateBillInsert.bind(this));
     this.router.post("/DOCTPATCON", this.saveDOCTPATCON.bind(this));
+    this.router.post("/getCurrentVisitType", this.getCurrentVisitType.bind(this));
+    this.router.post("/getCurrentVisitType1", this.getCurrentVisitType1.bind(this));
+    this.router.post("/getPatientList", this.getPatientList.bind(this));
+    this.router.post("/setPatientDetails", this.setPatientDetails.bind(this));
+    this.router.post("/getRegFee1", this.getRegFee1.bind(this));
 
+  }
+
+  async getCurrentVisitType(req: Request, res: Response): Promise<void> {
+    // Small helpers
+    const toInt = (v: any, def = 0) =>
+      v === null || v === undefined || v === "" ? def : parseInt(v, 10);
+
+    const formatYmd = (d?: Date | null) =>
+      d instanceof Date && !isNaN(d.getTime()) ? d.toISOString().substring(0, 10) : "";
+    // Expecting body fields similar to your C# VisitType class:
+    // { viewmode, TariffCode, HospitalId, DEPTCODE, mrno, consultationno, doctcode, IPFollowUp_Days }
+    const vt = req.body || {};
+
+    // Build MAIN query like C#
+    const mainQuery =
+      vt.viewmode === "false"
+        ? ` select DP.VisitType,DP.CLNORGCODE,DP.DOCTCODE,DP.MEDRECNO,DP.VisitType DPVisitType,DP.VISITS,DP.FreeVisit, DP.PaidVisit ,MC.Valid_Days,DP.LASTVISITDATE,MC.FreeFollowUp_No,MC.PaidFollowUp_No,DP.PAIDCONSDATE,DP.EDITED_ON,dp.IPFollowUp_Visits,MC.IP_FollowUp_Visits,MC.IP_FollowUp_Days from OPD_DOCTPATCON DP ,Mst_ChargeSheet_TM MC WHERE DP.DOCTCODE = MC.Doctor_ID AND MC.TARIFFID=@TARIFFCODE AND MC.CLNORGCODE =@HospitalId AND DP.CLNORGCODE=@CLNORGCODE AND DP.MEDRECNO=@mrno AND  DP.DOCTCODE=@doctcode `
+
+        : ` select CN.VISITTYPE,DP.CLNORGCODE,DP.DOCTCODE,DP.MEDRECNO,DP.VisitType DPVisitType,DP.VISITS,DP.FreeVisit, DP.PaidVisit ,MC.Valid_Days,DP.LASTVISITDATE,MC.FreeFollowUp_No,MC.PaidFollowUp_No,DP.PAIDCONSDATE,DP.EDITED_ON ,dp.IPFollowUp_Visits,MC.IP_FollowUp_Visits,MC.IP_FollowUp_Days from OPD_CONSULTATION CN LEFT  JOIN OPD_DOCTPATCON DP ON CN.DOCTCODE = DP.DOCTCODE LEFT  JOIN Mst_ChargeSheet_TM MC  ON DP.DOCTCODE = MC.Doctor_ID WHERE MC.TARIFFID=@TARIFFCODE AND MC.CLNORGCODE = @HospitalId AND DP.CLNORGCODE=@CLNORGCODE AND DP.MEDRECNO=@mrno AND  DP.DOCTCODE=@doctcode AND CN.OPDBILLNO=@consultationno `;
+
+    // Other query texts (1: latest IP discharge date window, 2: follow-up counters block, 3: latest cons dates)
+    const qLatestDisDate = `SELECT TOP 1 DISDATE FROM IPD_DISCHARGE WHERE IPNO IN (SELECT IPNO FROM IPD_ADMISSION WHERE ADMNDOCTOR = @doctcode AND MEDRECNO = @mrno AND CONVERT(varchar(10), DISCHRGDT, 120) >= DATEADD(D, -1*@IP_VISITDAYS, GETDATE())) `;
+
+    const qLatestPaidConsDateForDept = `SELECT TOP 1 PAIDCONSDATE FROM OPD_DOCTPATCON WHERE DOCTCODE IN (SELECT code FROM Mst_DoctorMaster WHERE Department = @DEPTCODE AND CONSBYDEPT = 'Y' AND STATUS = 'A' ) AND MEDRECNO = @mrno ORDER BY PAIDCONSDATE DESC; `;
+
+    const qLatestReceiptDateForNewVisit = `SELECT TOP 1 RECEIPTDATE FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DEPTCODE = @DEPTCODE AND STATUS !='c' AND VISITTYPE = '1' ORDER BY RECEIPTDATE DESC `;
+
+    const qFreeFollowupCountSince = `SELECT COUNT(*) AS Cnt FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DEPTCODE = @DEPTCODE AND CONVERT(varchar(10), RECEIPTDATE, 120) >= @RCPTDATE AND VISITTYPE = '2' AND STATUS != 'C' `;
+
+    const qPaidFollowupCountSince = ` SELECT COUNT(*) AS Cnt FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DEPTCODE = @DEPTCODE AND CONVERT(varchar(10), RECEIPTDATE, 120) >= @RCPTDATE AND VISITTYPE = '3' AND STATUS !='C'`;
+
+    const qIPFollowupCountWindow = ` SELECT COUNT(*) AS Cnt FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DOCTCODE = @doctcode AND CONVERT(varchar(10), RECEIPTDATE, 120) > DATEADD(D, -1*@IP_VISITDAYS, GETDATE()) AND VISITTYPE = '4' AND STATUS <> 'C' `;
+
+    // Shared params for main query
+    const mainParams = {
+      TARIFFCODE: vt.TariffCode,
+      HospitalId: vt.HospitalId,
+      CLNORGCODE: vt.HospitalId, // matches C#
+      mrno: vt.mrno,
+      DEPTCODE: vt.DEPTCODE,
+      consultationno: vt.consultationno,
+    };
+
+    try {
+      // 1) IP discharge window check (Dis_Date)
+      const disParams = {
+        doctcode: vt.doctcode,
+        mrno: vt.mrno,
+        IP_VISITDAYS: toInt(vt.IPFollowUp_Days, 0),
+      };
+      const disRes = await executeDbQuery(qLatestDisDate, disParams);
+      const Dis_Date: string =
+        disRes.records?.[0]?.DISDATE ? formatYmd(new Date(disRes.records[0].DISDATE)) : "";
+
+      // 2) MAIN query
+      const mainRes = await executeDbQuery(mainQuery, mainParams);
+      const dt = mainRes.records || [];
+
+      const results: Array<{
+        visitype: string;
+        IP_VISITS?: string;
+        VISITS?: string;
+        FreeVisit?: string;
+        PaidVisit?: string;
+        PAIDCONSDATE?: string;
+      }> = [];
+
+      // If no rows
+      if (dt.length === 0) {
+        if (Dis_Date !== "") {
+          results.push({
+            visitype: "4",
+            IP_VISITS: "0", // C# uses IPFollowUp_Visits variable at this branch; there it was 0 unless computed in rows
+          });
+        } else {
+          results.push({
+            visitype: "1",
+            VISITS: "0",
+            FreeVisit: "0",
+            PaidVisit: "0",
+          });
+        }
+
+        // Return early like C# would (it returns list with one item)
+        res.json({ d: results });
+
+      }
+
+      // 3) Rows exist — iterate like C#
+      for (const row of dt) {
+        const Valid_Days = toInt(row.Valid_Days, 0);
+        const VISITS = toInt(row.VISITS, 0);
+        const FreeVisit = toInt(row.FreeVisit, 0);
+        const PaidVisit = toInt(row.PaidVisit, 0);
+        const FreeFollowUp_No = toInt(row.FreeFollowUp_No, 0);
+        const PaidFollowUp_No = toInt(row.PaidFollowUp_No, 0);
+        const LASTVISITDATE = row.LASTVISITDATE ? new Date(row.LASTVISITDATE) : null;
+        const PAIDCONSDATE = row.PAIDCONSDATE ? new Date(row.PAIDCONSDATE) : new Date("1900-01-01");
+        const EDITED_ON = row.EDITED_ON ? new Date(row.EDITED_ON) : null;
+
+        const IP_FollowUp_Days = toInt(row.IP_FollowUp_Days, 0);
+        const IP_FollowUp_Visits = toInt(row.IP_FollowUp_Visits, 0);
+        const ipVisitDays = toInt(vt.IPFollowUp_Days ?? IP_FollowUp_Days, 0);
+
+        let visittype = "1";
+        let visitype = "0";
+        let CHKPAIDCONSDATE = "";
+        let RCPTDATE = "";
+
+        if (Dis_Date !== "") {
+          // IP Follow-up branch
+          const CHECKDATE = new Date(PAIDCONSDATE);
+          CHECKDATE.setDate(CHECKDATE.getDate() + ipVisitDays);
+
+          const CHKRCPTDATE = EDITED_ON ? formatYmd(EDITED_ON) : "";
+
+          const ipCountRes = await executeDbQuery(qIPFollowupCountWindow, {
+            mrno: vt.mrno,
+            doctcode: vt.doctcode,
+            IP_VISITDAYS: ipVisitDays,
+          });
+          const IPFOLLOWUP_COUNT = toInt(ipCountRes.records?.[0]?.Cnt, 0);
+
+          if (IPFOLLOWUP_COUNT < IP_FollowUp_Visits) {
+            results.push({
+              visitype: "4",
+              IP_VISITS: String(row.IPFollowUp_Visits ?? ""),
+            });
+          } else {
+            const ipChk = formatYmd(PAIDCONSDATE);
+            if (ipChk === "1900-01-01") {
+              results.push({
+                visitype: "1",
+                VISITS: String(VISITS),
+                FreeVisit: String(FreeVisit),
+                PaidVisit: String(PaidVisit),
+              });
+            } else {
+              // Need latest dept PAIDCONSDATE and latest RECEIPTDATE for new visits
+              const paidConsRes = await executeDbQuery(qLatestPaidConsDateForDept, {
+                DEPTCODE: vt.DEPTCODE,
+                mrno: vt.mrno,
+              });
+              const consDate =
+                paidConsRes.records?.[0]?.PAIDCONSDATE &&
+                new Date(paidConsRes.records[0].PAIDCONSDATE);
+              CHKPAIDCONSDATE = consDate ? formatYmd(consDate) : "";
+
+              const latestNewVisitRes = await executeDbQuery(qLatestReceiptDateForNewVisit, {
+                DEPTCODE: vt.DEPTCODE,
+                mrno: vt.mrno,
+              });
+              const latestRcpt =
+                latestNewVisitRes.records?.[0]?.RECEIPTDATE &&
+                new Date(latestNewVisitRes.records[0].RECEIPTDATE);
+              RCPTDATE = latestRcpt ? formatYmd(latestRcpt) : "";
+
+              const freeCntRes = await executeDbQuery(qFreeFollowupCountSince, {
+                DEPTCODE: vt.DEPTCODE,
+                mrno: vt.mrno,
+                RCPTDATE,
+              });
+              const Freefollowupcount = toInt(freeCntRes.records?.[0]?.Cnt, 0);
+
+              const paidCntRes = await executeDbQuery(qPaidFollowupCountSince, {
+                DEPTCODE: vt.DEPTCODE,
+                mrno: vt.mrno,
+                RCPTDATE,
+              });
+              const paidfollowupcount = toInt(paidCntRes.records?.[0]?.Cnt, 0);
+
+              const nowYmd = new Date();
+              const withinValid = nowYmd < new Date(CHECKDATE);
+
+              if (Freefollowupcount < FreeFollowUp_No) {
+                visittype = withinValid ? "2" : paidfollowupcount < PaidFollowUp_No && withinValid ? "3" : "1";
+              } else if (paidfollowupcount < PaidFollowUp_No) {
+                visittype = withinValid ? "3" : "1";
+              } else {
+                visittype = "1";
+              }
+
+              if (vt.viewmode === "true") {
+                visittype = row.VISITTYPE ? String(row.VISITTYPE) : "1";
+              }
+
+              results.push({
+                visitype,
+                VISITS: String(VISITS),
+                FreeVisit: String(FreeVisit),
+                PaidVisit: String(PaidVisit),
+                PAIDCONSDATE: CHKPAIDCONSDATE,
+              });
+            }
+          }
+        } else {
+          // NON-IP branch (same pattern as C#)
+          const CHECKDATE = new Date(PAIDCONSDATE);
+          CHECKDATE.setDate(CHECKDATE.getDate() + Valid_Days);
+
+          const paidConsRes = await executeDbQuery(qLatestPaidConsDateForDept, {
+            DEPTCODE: vt.DEPTCODE,
+            mrno: vt.mrno,
+          });
+          const consDate =
+            paidConsRes.records?.[0]?.PAIDCONSDATE &&
+            new Date(paidConsRes.records[0].PAIDCONSDATE);
+          CHKPAIDCONSDATE = consDate ? formatYmd(consDate) : "";
+
+          const latestNewVisitRes = await executeDbQuery(qLatestReceiptDateForNewVisit, {
+            DEPTCODE: vt.DEPTCODE,
+            mrno: vt.mrno,
+          });
+          const latestRcpt =
+            latestNewVisitRes.records?.[0]?.RECEIPTDATE &&
+            new Date(latestNewVisitRes.records[0].RECEIPTDATE);
+          RCPTDATE = latestRcpt ? formatYmd(latestRcpt) : "";
+
+          const freeCntRes = await executeDbQuery(qFreeFollowupCountSince, {
+            DEPTCODE: vt.DEPTCODE,
+            mrno: vt.mrno,
+            RCPTDATE,
+          });
+          const Freefollowupcount = toInt(freeCntRes.records?.[0]?.Cnt, 0);
+
+          const paidCntRes = await executeDbQuery(qPaidFollowupCountSince, {
+            DEPTCODE: vt.DEPTCODE,
+            mrno: vt.mrno,
+            RCPTDATE,
+          });
+          const paidfollowupcount = toInt(paidCntRes.records?.[0]?.Cnt, 0);
+
+          const nowYmd = new Date();
+          const withinValid = nowYmd < CHECKDATE;
+
+          if (Freefollowupcount < FreeFollowUp_No) {
+            visittype = withinValid ? "2" : paidfollowupcount < PaidFollowUp_No && withinValid ? "3" : "1";
+          } else if (paidfollowupcount < PaidFollowUp_No) {
+            visittype = withinValid ? "3" : "1";
+          } else {
+            visittype = "1";
+          }
+
+          if (vt.viewmode === "true") {
+            visittype = row.VISITTYPE ? String(row.VISITTYPE) : "1";
+          }
+
+          results.push({
+            visitype,
+            VISITS: String(VISITS),
+            FreeVisit: String(FreeVisit),
+            PaidVisit: String(PaidVisit),
+            PAIDCONSDATE: CHKPAIDCONSDATE,
+          });
+        }
+      }
+
+      // Match ASP.NET PageMethod shape so your existing success handler works:
+      // success: function(data) { for(...) data.d[i] ... }
+      res.json({ status: 0, d: results });
+    } catch (err: any) {
+      // For parity with your other endpoints
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async getCurrentVisitType1(req: Request, res: Response): Promise<void> {
+    const input: VisitType = req.method === "GET" ? (req.query as any) : req.body;
+
+    let query = "";
+    if (input.viewmode === "false") {
+      query = ` SELECT DP.VisitType, DP.CLNORGCODE, DP.DOCTCODE, DP.MEDRECNO, DP.VisitType AS DPVisitType, DP.VISITS, DP.FreeVisit, DP.PaidVisit, MC.Valid_Days, DP.LASTVISITDATE, MC.FreeFollowUp_No, MC.PaidFollowUp_No, DP.PAIDCONSDATE, DP.EDITED_ON, DP.IPFollowUp_Visits, MC.IP_FollowUp_Visits, MC.IP_FollowUp_Days FROM OPD_DOCTPATCON DP, Mst_ChargeSheet_TM MC WHERE DP.DOCTCODE = MC.Doctor_ID AND MC.TARIFFID=@TARIFFCODE AND MC.CLNORGCODE=@HospitalId AND DP.CLNORGCODE=@CLNORGCODE AND DP.MEDRECNO=@mrno AND DP.DOCTCODE=@doctcode
+    `;
+    } else {
+      query = ` SELECT CN.VISITTYPE, DP.CLNORGCODE, DP.DOCTCODE, DP.MEDRECNO, DP.VisitType AS DPVisitType, DP.VISITS, DP.FreeVisit, DP.PaidVisit, MC.Valid_Days, DP.LASTVISITDATE, MC.FreeFollowUp_No, MC.PaidFollowUp_No, DP.PAIDCONSDATE, DP.EDITED_ON, DP.IPFollowUp_Visits, MC.IP_FollowUp_Visits, MC.IP_FollowUp_Days FROM OPD_CONSULTATION CN LEFT JOIN OPD_DOCTPATCON DP ON CN.DOCTCODE = DP.DOCTCODE LEFT JOIN Mst_ChargeSheet_TM MC ON DP.DOCTCODE = MC.Doctor_ID WHERE MC.TARIFFID=@TARIFFCODE AND MC.CLNORGCODE=@HospitalId AND DP.CLNORGCODE=@CLNORGCODE AND DP.MEDRECNO=@mrno AND DP.DOCTCODE=@doctcode AND CN.OPDBILLNO=@consultationno `;
+    }
+
+    try {
+      const pool = await conpool.connect();
+
+      // 🔹 Get Latest Discharge Date
+      const disQry = ` SELECT TOP 1 DISDATE FROM IPD_DISCHARGE WHERE IPNO IN ( SELECT IPNO FROM IPD_ADMISSION WHERE ADMNDOCTOR=@doctcode AND MEDRECNO=@mrno AND CONVERT(varchar(10), DISCHRGDT,120) >= DATEADD(D,-1*@IP_VISITDAYS, GETDATE())) `;
+
+      const disParams = {
+        doctcode: input.doctcode,
+        mrno: input.mrno,
+        IP_VISITDAYS: input.IPFollowUp_Days,
+      };
+
+      const disRes = await executeDbQuery(disQry, disParams);
+      const Dis_Date = disRes.records?.[0]?.DISDATE || "";
+
+      // 🔹 Execute main query
+      const mainParams = {
+        TARIFFCODE: input.TariffCode,
+        HospitalId: input.HospitalId,
+        CLNORGCODE: input.HospitalId,
+        mrno: input.mrno,
+        doctcode: input.doctcode,
+        DEPTCODE: input.DEPTCODE,
+        consultationno: input.consultationno,
+      };
+
+      const mainRes = await executeDbQuery(query, mainParams);
+      const dt = mainRes.records;
+      const visityTypes: VisitTypeResponse[] = [];
+
+      if (dt.length === 0) {
+        if (Dis_Date !== "") {
+          visityTypes.push({ visitype: "4", IP_VISITS: "0" });
+        } else {
+          visityTypes.push({
+            visitype: "1",
+            VISITS: "0",
+            FreeVisit: "0",
+            PaidVisit: "0",
+          });
+        }
+        res.json({ status: 0, result: visityTypes });
+        return;
+      }
+
+      for (const dr of dt) {
+        const visits = safeVal(dr.VISITS, 0);
+        const freevisits = safeVal(dr.FreeVisit, 0);
+        const paidvisits = safeVal(dr.PaidVisit, 0);
+        const freefolowup = safeVal(dr.FreeFollowUp_No, 0);
+        const paidfollowup = safeVal(dr.PaidFollowUp_No, 0);
+        const validDays = safeVal(dr.Valid_Days, 0);
+        const PAIDCONSDATE = dr.PAIDCONSDATE ? new Date(dr.PAIDCONSDATE) : null;
+        const RECEIPTDATE = dr.EDITED_ON ? new Date(dr.EDITED_ON) : null;
+        const IP_FOLLOWUP_VISITS = safeVal(dr.IP_FollowUp_Visits, 0);
+
+        let visittype = "1";
+        let visitype = "0";
+
+        // 🔹 Apply discharge logic
+        if (Dis_Date !== "") {
+          // Count IP followup consultations
+          const ipParams = {
+            doctcode: input.doctcode,
+            mrno: input.mrno,
+            IP_VISITDAYS: input.IPFollowUp_Days,
+          };
+
+          const ipRes = await executeDbQuery(`SELECT COUNT(*) AS CNT FROM OPD_CONSULTATION WHERE MEDRECNO=@mrno AND DOCTCODE=@doctcode AND CONVERT(varchar(10),RECEIPTDATE,120) > DATEADD(D,-1*@IP_VISITDAYS,GETDATE()) AND VISITTYPE='4' AND STATUS!='C' `,
+            ipParams
+          );
+
+          const IPFOLLOWUP_COUNT = ipRes.records?.[0]?.CNT || 0;
+          if (IPFOLLOWUP_COUNT < IP_FOLLOWUP_VISITS) {
+            visityTypes.push({
+              visitype: "4",
+              IP_VISITS: dr.IPFollowUp_Visits?.toString(),
+            });
+            continue;
+          }
+        }
+
+        // 🔹 Follow-up logic
+        if (freevisits < freefolowup) {
+          visittype = "2";
+        } else if (paidvisits < paidfollowup) {
+          visittype = "3";
+        } else {
+          visittype = "1";
+        }
+
+        // 🔹 Override in viewmode
+        if (input.viewmode === "true") {
+          visittype = dr.VISITTYPE ? dr.VISITTYPE.toString() : "1";
+        }
+
+        visityTypes.push({
+          visitype,
+          VISITS: visits.toString(),
+          FreeVisit: freevisits.toString(),
+          PaidVisit: paidvisits.toString(),
+          PAIDCONSDATE: PAIDCONSDATE
+            ? PAIDCONSDATE.toISOString().split("T")[0]
+            : undefined,
+        });
+      }
+
+      res.json({ status: 0, result: visityTypes });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
   }
 
   async getFessOnDoctorCode(req: Request, res: Response): Promise<void> {
@@ -132,13 +527,27 @@ export default class opController {
       res.status(500).json({ status: 1, result: err.message });
     }
   }
-  
+
   async GetPaymentType(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
 
     const sql = `select Payment_Type,* from Mst_PatientCategory where PC_Code=@PATCATGCD`;
 
     const params = { PATCATGCD: input.PatientCategory }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async GetPATTYPE(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const sql = `SELECT count(*) FROM OPD_DOCTPATCON WHERE MEDRECNO=@MEDRECNO`;
+
+    const params = { MEDRECNO: input.MEDRECNO }
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -203,7 +612,7 @@ export default class opController {
     const input = req.method === "GET" ? req.query : req.body;
     const sql = `SELECT GENTOKEN FROM OPD_DOCTTOKENNO WHERE DOCTCODE=@DOCTCD AND CLNORGCODE=@HOSPID AND CONVERT(VARCHAR(10),CONSDATE,120)=CONVERT(VARCHAR(10),GETDATE(),120) `;
 
-    const params = { DOCTCODE: input.DOCTCODE, HOSPID: input.HospitalId}
+    const params = { DOCTCODE: input.DOCTCODE, HOSPID: input.HospitalId }
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -1373,6 +1782,216 @@ export default class opController {
 
       // Return error response (similar to C# returning "0")
       res.status(500).json({ status: 1, message: err.message, result: 0 });
+    }
+  }
+
+  async getPatientList(req: Request, res: Response): Promise<void> {
+    const input: PatSearchCriteria = req.body.pat || {};
+
+
+    // HTML table start
+    let table = `
+    <thead>
+      <tr class='success'>
+        <th style='text-align: left;'>MR Number</th>
+        <th style='text-align: left; display: none'>MR Number DOM</th>
+        <th style='text-align: left;'>IP Number</th>
+        <th style='text-align: left; display: none'>IP Number DOM</th>
+        <th style='text-align: left;'>Patient Name</th>
+        <th style='text-align: left;'>Gender</th>
+        <th style='text-align: left;'>Age</th>
+        <th style='text-align: left;'>DOB</th>
+        <th style='text-align: left;'>Mobile</th>
+        <th style='text-align: left;'>Address1</th>
+        <th style='text-align: left;'>Father Name</th>
+      </tr>
+    </thead>
+    <tbody>
+  `;
+
+    try {
+      const query = `EXEC USP_GET_PATIENT_DETAILS @HospitalId = @HospitalId, @PATTYPE = @PATTYPE, @MRNO =  @MRNO, @DOCTCODE = @DOCTCODE, @IPNO = @IPNO, @OPDREGNO = @OPDREGNO`;
+
+      const params = { HospitalId: input.hospid, PATTYPE: input.pattypesearch, MRNO: input.mrno, DOCTCODE: input.doctcd, IPNO: input.ipno, OPDREGNO: input.mrno };
+
+      const result = await executeDbQuery(query, params);
+      const records = result.records || [];
+      for (const dr of records) {
+        table += `
+        <tr>
+          <td style='text-align: left;'>${dr["PatientMr_No"] || ""}</td>
+          <td style='text-align: left; display:none'>${input.patMrnoDOM || ""}</td>
+          <td style='text-align: left;'>${dr["IPNO"] || ""}</td>
+          <td style='text-align: left; display:none'>${input.patIpnoDOM || ""}</td>
+          <td style='text-align: left;'>${dr["Patient_Name"] || ""}</td>
+          <td style='text-align: left;'>${dr["Gender"] || ""}</td>
+          <td style='text-align: left;'>${dr["Age"] || ""}</td>
+          <td style='text-align: left;'>${dr["Patient_DOB"] ? new Date(dr["Patient_DOB"]).toISOString().substring(0, 10) : ""}</td>
+          <td style='text-align: left;'>${dr["Mobile"] || ""}</td>
+          <td style='text-align: left;'>${dr["Address1"] || ""}</td>
+          <td style='text-align: left;'>${dr["fathername"] || ""}</td>
+        </tr>
+      `;
+      }
+
+      table += "</tbody>";
+
+      res.json({ status: 0, d: table });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async setPatientDetails(req: Request, res: Response): Promise<void> {
+    const input: PatSearchCriteria = req.body.pat || {};
+
+
+    try {
+      const params = {
+        HospitalId: input.hospid,
+        PATTYPE: input.pattypesearch,
+        MRNO: input.mrno,
+        DOCTCODE: input.doctcd,
+        IPNO: input.ipno,
+        OPDREGNO: input.patOPNum || input.mrno,
+      };
+
+      const query = "USP_GET_PATIENT_DETAILS";
+
+      const dbRes = await executeDbQuery(query, params, { isStoredProc: true });
+
+      const patobj: PatientSearchObj[] = (dbRes.records || []).map((dr: any) => ({
+        consultno: dr.CONSULTNO,
+        consdate: formatDate(dr.CONSDATE),
+        mrno: dr.PatientMr_No,
+        ipno: dr.IPNO,
+        patsalutationid: dr.Salutation,
+        patname: dr.Patient_Name?.toUpperCase(),
+        gender: dr.Gender,
+        age: dr.Age,
+        dob: formatDate(dr.Patient_DOB),
+        mobile: dr.Mobile,
+        telphone: dr.Telephone,
+        email: dr.Email,
+        address1: dr.Address1,
+        address2: dr.Address2,
+        address3: dr.Address3,
+        pincode: dr.PinCode,
+        countryid: dr.Country,
+        stateid: dr.State,
+        districtid: dr.District,
+        cityid: dr.City_Id,
+        departmentid: dr.Department,
+        patcatid: dr.Patient_Category_Id,
+        tarifcatid: dr.Tariff_Category,
+        doctcd: dr.DOCTCODE,
+        doctname: dr.DOCTNAME,
+        patsalutation: dr.PAT_SALUTATION,
+        country: dr.Country_Name,
+        state: dr.State_Name,
+        district: dr.District_Name,
+        city: dr.CityName,
+        deptname: dr.DEPTNAME,
+        patcat: dr.PC_Name,
+        tarifcat: dr.TARIFFDESC,
+        firstname: dr.FirstName?.toUpperCase(),
+        middlename: dr.MiddleName?.toUpperCase(),
+        lastname: dr.LastName?.toUpperCase(),
+        fathername: dr.fathername?.toUpperCase(),
+        hieght: dr.Height,
+        weight: dr.weight,
+        bloodgroup: dr.Blood_Group?.trim(),
+        maritalstatus: dr.Marital_Status?.trim(),
+        pattype: dr.PatientType,
+        uniqueid: dr.UniqueId,
+        compid: dr.Comp_Id,
+        compname: dr.COMPName,
+        empidcardno: dr.EmpIdCardNo,
+        letterno: dr.LetterNo,
+        limit: dr.Limit,
+        validdate: formatDate(dr.ValidDate),
+        empid: dr.EmpId,
+        empname: dr.EmpName,
+        empreftype: dr.EmpRefType,
+        empdeptid: dr.EmpDept,
+        empdeptname: dr.DEPTNAME,
+        empdesgcd: dr.EmpDesgcode,
+        empdesgname: dr.DESGNAME,
+        refdoctcd: dr.RefDoct_ID,
+        refdoctname: dr.refdoctname?.toUpperCase(),
+        BEDNO: dr.BEDNO,
+        WARDNUMBER: dr.WARDNUMBER,
+        AdmitDt: dr.AdmitDt,
+        AdmitTM: dr.AdmitTM,
+        ADMNDOCTOR: dr.ADMNDOCTOR,
+        DoctorName: dr.DoctorName,
+        PRBEDCATG: dr.PRBEDCATG,
+        BedCategory: dr.BedCategory,
+        NURSCODE: dr.NURSCODE,
+        NURSINGSTATION: dr.NURSINGSTATION,
+        FOLIONO: dr.FOLIONO,
+        DISCHRGDT: formatDate(dr.DISCHRGDT),
+        OPNum: dr.OPDREGNO,
+      }));
+
+      res.json({ status: 0, result: patobj });
+      return;
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async getRegFee1(req: Request, res: Response): Promise<void> {
+    const input = req.body.Regfee; 
+
+    try {
+      let result = 0;
+      let result1 = 0;
+
+      // If MedrecNo is provided, check OPD and IPD tables
+      if (input.MedrecNo && input.MedrecNo.trim() !== "") {
+        // Query OPD_DOCTPATCON
+        const opdRes = await executeDbQuery(
+          "SELECT COUNT(*) as CNT FROM OPD_DOCTPATCON WHERE MEDRECNO = @MedrecNo AND STATUS <> 'C'",
+          { MedrecNo: input.MedrecNo }
+        );
+        result = safeNumber(opdRes.records[0]?.CNT);
+
+        // Query IPD_ADMISSION
+        const ipdRes = await executeDbQuery(
+          "SELECT COUNT(*) as CNT FROM IPD_ADMISSION WHERE MEDRECNO = @MedrecNo AND STATUS <> 'C'",
+          { MedrecNo: input.MedrecNo }
+        );
+        result1 = safeNumber(ipdRes.records[0]?.CNT);
+      }
+
+      let registrationFees: RegistrationFee[] = [];
+
+      if (result > 0 || result1 > 0) {
+        // Patient already exists → return default 0 fee
+        registrationFees.push({
+          regfeetype: "P",
+          opddiscount: 0,
+          regfeeamount: 0,
+        });
+      } else {
+        // Otherwise, fetch RegnFee_Amount from Mst_FacilitySetup
+        const query = `SELECT ISNULL(RegnFee_Amount, '0.00') as RegnFee_Amount FROM Mst_FacilitySetup WHERE CLNORGCODE = @CLNORGCODE `;
+        const params = { CLNORGCODE: input.HospitalId };
+        const regRes = await executeDbQuery(query, params);
+
+        for (const dr of regRes.records) {
+          registrationFees.push({
+            regfeetype: "P",
+            opddiscount: 0,
+            regfeeamount: input.patcat === "003" ? 0 : safeNumber(dr.RegnFee_Amount),
+          });
+        }
+      }
+
+      res.json({ status: 0, d: registrationFees });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
     }
   }
 
