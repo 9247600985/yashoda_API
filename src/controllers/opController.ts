@@ -25,6 +25,8 @@ export default class opController {
     this.router.get("/GetPaymentType", this.GetPaymentType.bind(this));
     this.router.get("/loadOPRefDocRefAgent", this.loadOPRefDocRefAgent.bind(this));
     this.router.get("/GetPATTYPE", this.GetPATTYPE.bind(this));
+    this.router.get("/getPatCategoryDetails", this.getPatCategoryDetails.bind(this));
+    this.router.get("/ServeicePageconsult", this.ServeicePageconsult.bind(this));
     this.router.put("/DOCTPATCON", this.updateDOCTPATCON.bind(this));
     this.router.put("/DOCTPATCON1", this.updateDOCTPATCON1.bind(this));
     this.router.put("/PatientMaster", this.updatePatientMaster.bind(this));
@@ -551,6 +553,34 @@ export default class opController {
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async getPatCategoryDetails(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const sql = `select t.CLNORGCODE,t.TARIFFID,t.TARIFFDESC,t.REC_STATUS,t.RevisionId ,p.Payment_Type from MST_TARIFFCATGORY t,Mst_PatientCategory p where t.TARIFFID=p.Tariff_Category and p.PC_Code=@PC_Code`;
+
+    const params = { PC_Code: input.PatCatCd }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async ServeicePageconsult(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const sql = `select opd.servcode,mst.servname,opd.quantity,opd.rate,opd.amount from opd_billtrn opd  inner join  mst_services mst on opd.servcode=mst.servcode  where billno=@billno order by mst.servname desc`;
+
+    const params = { billno: input.billno }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, d: records });
     } catch (err: any) {
       res.status(500).json({ status: 1, result: err.message });
     }

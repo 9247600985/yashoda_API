@@ -1,5 +1,8 @@
 import express, { Application, Request, Response, Router } from "express";
 import { executeDbQuery } from "../db";
+import { console } from "inspector";
+import { logInfo } from "../utilities/logger";
+import { Session } from "inspector/promises";
 
 export default class reportsController {
   private router: Router = express.Router();
@@ -7,13 +10,13 @@ export default class reportsController {
   constructor(private app: Router) {
     app.use("/reports", this.router);
 
-    this.router.get("/AccountReport", this.AccountReport.bind(this));
-    this.router.get("/AmbulanceDetails", this.AmbulanceDetails.bind(this));
-    this.router.get("/BillRegisterCollectionSummary", this.BillRegisterCollectionSummary.bind(this));
-    this.router.get("/DeptWiseCollectionSummary", this.DeptWiseCollectionSummary.bind(this));
-    this.router.get("/DeptWiseReportForAccounts", this.DeptWiseReportForAccounts.bind(this));
-    this.router.get("/InvestigationWiseCollection", this.InvestigationWiseCollection.bind(this));
-    this.router.get("/ConsultationWise", this.ConsultationWise.bind(this));
+    this.router.get("/AccountReport", this.AccountReport.bind(this)); 
+    this.router.get("/AmbulanceDetails", this.AmbulanceDetails.bind(this)); 
+    this.router.get("/BillRegisterCollectionSummary", this.BillRegisterCollectionSummary.bind(this)); 
+    this.router.get("/DeptWiseCollectionSummary", this.DeptWiseCollectionSummary.bind(this)); 
+    this.router.get("/DeptWiseReportForAccounts", this.DeptWiseReportForAccounts.bind(this)); 
+    this.router.get("/InvestigationWiseCollection", this.InvestigationWiseCollection.bind(this)); 
+    this.router.get("/ConsultationWise", this.ConsultationWise.bind(this)); 
   }
 
   async AccountReport(req: Request, res: Response): Promise<void> {
@@ -37,9 +40,17 @@ export default class reportsController {
   async AmbulanceDetails(req: Request, res: Response): Promise<void> {
     const input = req.method === 'GET' ? req.query : req.body;
 
-    const sql = `SELECT CONVERT(VARCHAR(10),DEPARTURE_DATE  ,105) BDATE,OPBILLNO BILLNO,PATIENT_NAME[PATIENT NAME],VEHICLENO,DRIVER_NAME[DRIVER NAME],TRAVEL_TO[DESTINATION] , CHARGES AMOUNT FROM YH_AMBULANCE_DETAILS WHERE   CONVERT(VARCHAR(10),DEPARTURE_DATE  ,120)  BETWEEN @FDATE AND @TDATE AND STATUS = 'A' AND CLNORGCODE LIKE @CLNORGCODE `;
+    let hospid = input.hospid || "";
+
+    if (hospid === "001001001000") {
+      hospid = "%%";
+    } else {
+      hospid = `%${hospid}%`;
+    }
+
+    const sql = `SELECT CONVERT(VARCHAR(10),DEPARTURE_DATE  ,105) BDATE,OPBILLNO BILLNO,PATIENT_NAME[PATIENT_NAME],VEHICLENO,DRIVER_NAME[DRIVER_NAME],TRAVEL_TO[DESTINATION] , CHARGES AMOUNT FROM YH_AMBULANCE_DETAILS WHERE   CONVERT(VARCHAR(10),DEPARTURE_DATE  ,120)  BETWEEN @FDATE AND @TDATE AND STATUS = 'A' AND CLNORGCODE LIKE @hospid `;
     try {
-      const { records } = await executeDbQuery(sql, { FDATE: input.FDATE, TDATE: input.TDATE, CLNORGCODE: `%${input.hospid}%` });
+      const { records } = await executeDbQuery(sql, { FDATE: input.FDATE, TDATE: input.TDATE, hospid });
       res.json({ status: 0, result: records });
     } catch (err: any) {
       res.status(500).json({ status: 1, result: err.message });
@@ -49,10 +60,19 @@ export default class reportsController {
   async BillRegisterCollectionSummary(req: Request, res: Response): Promise<void> {
     
     const input = req.method === 'GET' ? req.query : req.body;
+    let hospid='';
+
+    if (!input.Clinic_Code) {
+      hospid = input.hospitalId || "";
+    } else if (input.Clinic_Code === "001001001000") {
+      hospid = "";
+    } else {
+      hospid = input.Clinic_Code;
+    }
 
     const sql = `select TM.CLINIC_NAME,UM.USERNAME,BM.MEDRECNO,BM.BILLNO, convert(varchar(10),BM.BILLDATE,103)as BILLDATE , BM.PATFNAME AS Patientname, ISNULL( RF.REFDOCTOR_FNAME,'') AS REF_DOC ,BM.TOTALBILLAMT,BM.TOTDISCOUNT,BM.AMOUNTPAID,0 AS DUEAMOUNT,BM.RFNDAMOUNT,(BM.AMOUNTPAID-BM.RFNDAMOUNT)AS NETAMOUNT   , STUFF((SELECT '; ' + S.SERVNAME   FROM MST_SERVICES S, OPD_BILLTRN D WHERE S.SERVCODE = D.SERVCODE AND  D.BILLNO = BM.BILLNO   ORDER BY S.SERVNAME    FOR XML PATH('')), 1, 1, '') SERVNAME   from OPD_BILLMST BM left join Mst_ReferralDoctor RF on RF.RefDoct_ID = BM.REFDOCTCD   INNER JOIN Mst_UserDetails UM ON UM.USERID=BM.CREATED_BY  INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE=BM.CLNORGCODE WHERE convert(varchar(10), Bm.BILLDATE, 120)>=@FROMDATE    and convert(varchar(10), Bm.BILLDATE, 120)<=@TODATE AND BM.CREATED_BY LIKE @UserId AND BM.CLNORGCODE like @hospid ORDER BY 1,2 `;
     try {
-      const { records } = await executeDbQuery(sql, { FROMDATE: input.FROMDATE, TODATE: input.TODATE, UserId: `%${input.UserId}%`, hospid: `%${input.hospid}%` });
+      const { records } = await executeDbQuery(sql, { FROMDATE: input.FROMDATE, TODATE: input.TODATE, UserId: `%${input.UserId}%`, hospid: hospid ? `%${hospid}%` : "%%" });
       res.json({ status: 0, result: records });
     } catch (err: any) {
       res.status(500).json({ status: 1, result: err.message });
@@ -68,9 +88,9 @@ export default class reportsController {
     let hospid = '';
 
     if (!input.Clinic_Code) {
-      hospid = input.SessionHospitalId || ''; // fallback if you pass hospitalId from client
-    } else if (input.Clinic_Code === '001001001000') {
-      hospid = '';
+      hospid = input.hospitalId || "";
+    } else if (input.Clinic_Code === "001001001000") {
+      hospid = "";
     } else {
       hospid = input.Clinic_Code;
     }
@@ -98,10 +118,10 @@ export default class reportsController {
       Refund_cond = ` AND (OD.PATCNAMT+OD.COMCNAMT)>0 `;
     }
 
-    const sql = ` SELECT PD.PAYMODE, oh.DOCTCD, DM1.FIRSTNAME, OH.MEDRECNO Regno, CONVERT(VARCHAR(10), OH.BILLDATE, 103) AS Regdate, OH.PATNAME Patientname, CASE WHEN D.LABDPTDESC IS NULL THEN ddm.DEPTNAME ELSE D.LABDPTDESC END DEPTNAME, S.SERVNAME Investigation, OD.AMOUNT TotalAmt, SERDISCOUNT DiscAmt, OD.AMOUNT - OD.SERDISCOUNT Paid, 0 DueAmt, (OD.PATCNAMT+OD.COMCNAMT) REFUNDAMT, (OD.AMOUNT - OD.SERDISCOUNT - (OD.PATCNAMT+OD.COMCNAMT)) NetAmt, U.USERNAME, TM.CLINIC_NAME FROM OPD_BILLMST OH LEFT JOIN OPD_BILLTRN OD ON OH.BILLNO = OD.BILLNO LEFT JOIN MST_SERVICES S ON OD.SERVCODE = S.SERVCODE LEFT JOIN Mst_Department ddm ON ddm.deptcode = S.DEPTCODE LEFT JOIN DGL_TESTMASTER DM ON DM.TESTCODE = S.SERVCODE LEFT JOIN DGL_LABDEPT D ON D.LABDPTCODE = DM.LABDPTCODE LEFT JOIN MST_USERDETAILS U ON OH.CREATED_BY = U.USERID LEFT JOIN Mst_DoctorMaster DM1 ON DM1.CODE = OH.DOCTCD INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = OH.CLNORGCODE INNER JOIN PAYMODE PD ON PD.PAYMODEID = OH.PAYMODE WHERE OH.BILLTYPE = 'OB' AND OH.CLNORGCODE LIKE @Clinic_Code AND CONVERT(VARCHAR(10), OH.BILLDATE, 120) >= @FROMDATE AND CONVERT(VARCHAR(10), OH.BILLDATE, 120) <= @TODATE AND OH.CREATED_BY LIKE @UserId ${Serv_Type_Cond} ${Discount_cond} ${Refund_cond} AND OH.DOCTCD LIKE @DoctCode ORDER BY D.LABDPTDESC `;
+    const sql = ` SELECT PD.PAYMODE, oh.DOCTCD, DM1.FIRSTNAME, OH.MEDRECNO Regno, CONVERT(VARCHAR(10), OH.BILLDATE, 103) AS Regdate, OH.PATNAME Patientname, CASE WHEN D.LABDPTDESC IS NULL THEN ddm.DEPTNAME ELSE D.LABDPTDESC END DEPTNAME, S.SERVNAME Investigation, OD.AMOUNT TotalAmt, SERDISCOUNT DiscAmt, OD.AMOUNT - OD.SERDISCOUNT Paid, 0 DueAmt, (OD.PATCNAMT+OD.COMCNAMT) REFUNDAMT, (OD.AMOUNT - OD.SERDISCOUNT - (OD.PATCNAMT+OD.COMCNAMT)) NetAmt, U.USERNAME, TM.CLINIC_NAME FROM OPD_BILLMST OH LEFT JOIN OPD_BILLTRN OD ON OH.BILLNO = OD.BILLNO LEFT JOIN MST_SERVICES S ON OD.SERVCODE = S.SERVCODE LEFT JOIN Mst_Department ddm ON ddm.deptcode = S.DEPTCODE LEFT JOIN DGL_TESTMASTER DM ON DM.TESTCODE = S.SERVCODE LEFT JOIN DGL_LABDEPT D ON D.LABDPTCODE = DM.LABDPTCODE LEFT JOIN MST_USERDETAILS U ON OH.CREATED_BY = U.USERID LEFT JOIN Mst_DoctorMaster DM1 ON DM1.CODE = OH.DOCTCD INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = OH.CLNORGCODE INNER JOIN PAYMODE PD ON PD.PAYMODEID = OH.PAYMODE WHERE OH.BILLTYPE = 'OB' AND OH.CLNORGCODE LIKE @hospid AND CONVERT(VARCHAR(10), OH.BILLDATE, 120) >= @FROMDATE AND CONVERT(VARCHAR(10), OH.BILLDATE, 120) <= @TODATE AND OH.CREATED_BY LIKE @UserId ${Serv_Type_Cond} ${Discount_cond} ${Refund_cond} AND OH.DOCTCD LIKE @DoctCode ORDER BY D.LABDPTDESC `;
 
     try {
-      const { records } = await executeDbQuery(sql, { FROMDATE: input.FROMDATE, TODATE: input.TODATE, UserId: `%${input.UserId}%`, Clinic_Code: `%${hospid}%`, DoctCode: `%${input.DoctCode || ''}%` });
+      const { records } = await executeDbQuery(sql, { FROMDATE: input.FROMDATE, TODATE: input.TODATE, UserId: `%${input.UserId}%`, hospid: hospid ? `%${hospid}%` : "%%", DoctCode: `%${input.DoctCode || ''}%` });
 
       res.json({ status: 0, result: records });
     } catch (err: any) {
@@ -112,10 +132,19 @@ export default class reportsController {
   async DeptWiseReportForAccounts(req: Request, res: Response): Promise<void> {
     const input = req.method === 'GET' ? req.query : req.body;
 
-    const sql = ` SELECT PD.PAYMODE AS BILLPAYMODE, CASE WHEN (OD.PATCNAMT+OD.COMCNAMT)!=0 THEN PD_RF.PAYMODE ELSE '' END AS RF_PAYMODE, OH.DOCTCD, DM1.FIRSTNAME, OH.MEDRECNO Regno, CONVERT(varchar(10), OH.BILLDATE, 103) AS Regdate, OH.PATNAME Patientname, CASE WHEN D.LABDPTDESC IS NULL THEN DDM.DEPTNAME ELSE D.LABDPTDESC END DEPTNAME, S.SERVNAME Investigation, OD.AMOUNT TotalAmt, SERDISCOUNT DiscAmt, OD.AMOUNT - OD.SERDISCOUNT Paid, 0 DueAmt, (OD.PATCNAMT + OD.COMCNAMT) REFUNDAMT, (OD.AMOUNT - (OD.SERDISCOUNT) - (OD.PATCNAMT + OD.COMCNAMT)) NetAmt, U.USERNAME, TM.CLINIC_NAME, ORM.REMARKS, CASE WHEN (OD.PATCNAMT+OD.COMCNAMT)!=0 THEN ORM_RF.REMARKS ELSE '' END AS REFUND_REMARKS FROM OPD_BILLMST OH LEFT JOIN OPD_RECEIPTS ORM ON ORM.OPDBILLNO = OH.BILLNO AND ORM.RCPTTYPE != 'OF' LEFT JOIN OPD_RECEIPTS ORM_RF ON ORM_RF.OPDBILLNO = OH.BILLNO AND ORM_RF.RCPTTYPE = 'OF' LEFT JOIN OPD_BILLTRN OD ON OH.BILLNO = OD.BILLNO LEFT JOIN MST_SERVICES S ON OD.SERVCODE = S.SERVCODE LEFT JOIN MST_DEPARTMENT DDM ON DDM.DEPTCODE = S.DEPTCODE LEFT JOIN DGL_TESTMASTER DM ON DM.TESTCODE = S.SERVCODE LEFT JOIN DGL_LABDEPT D ON D.LABDPTCODE = DM.LABDPTCODE LEFT JOIN MST_USERDETAILS U ON OH.CREATED_BY = U.USERID LEFT JOIN MST_DOCTORMASTER DM1 ON DM1.CODE = OH.DOCTCD INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = OH.CLNORGCODE LEFT JOIN PAYMODE PD ON PD.PAYMODEID = OH.PAYMODE LEFT JOIN PAYMODE PD_RF ON PD_RF.PAYMODEID = ORM_RF.PAYMODE WHERE OH.CLNORGCODE LIKE @Clinic_Code AND CONVERT(varchar(10), OH.BILLDATE, 120) >= @FROMDATE AND CONVERT(varchar(10), OH.BILLDATE, 120) <= @TODATE AND OH.CREATED_BY LIKE @UserId AND OH.DOCTCD LIKE @DoctCode ORDER BY D.LABDPTDESC; `;
+    let hospid='';
+    if (!input.Clinic_Code) {
+      hospid = input.hospitalId || "";
+    } else if (input.Clinic_Code === "001001001000") {
+      hospid = "";
+    } else {
+      hospid = input.Clinic_Code;
+    }
+
+    const sql = ` SELECT PD.PAYMODE AS BILLPAYMODE, CASE WHEN (OD.PATCNAMT+OD.COMCNAMT)!=0 THEN PD_RF.PAYMODE ELSE '' END AS RF_PAYMODE, OH.DOCTCD, DM1.FIRSTNAME, OH.MEDRECNO Regno, CONVERT(varchar(10), OH.BILLDATE, 103) AS Regdate, OH.PATNAME Patientname, CASE WHEN D.LABDPTDESC IS NULL THEN DDM.DEPTNAME ELSE D.LABDPTDESC END DEPTNAME, S.SERVNAME Investigation, OD.AMOUNT TotalAmt, SERDISCOUNT DiscAmt, OD.AMOUNT - OD.SERDISCOUNT Paid, 0 DueAmt, (OD.PATCNAMT + OD.COMCNAMT) REFUNDAMT, (OD.AMOUNT - (OD.SERDISCOUNT) - (OD.PATCNAMT + OD.COMCNAMT)) NetAmt, U.USERNAME, TM.CLINIC_NAME, ORM.REMARKS, CASE WHEN (OD.PATCNAMT+OD.COMCNAMT)!=0 THEN ORM_RF.REMARKS ELSE '' END AS REFUND_REMARKS FROM OPD_BILLMST OH LEFT JOIN OPD_RECEIPTS ORM ON ORM.OPDBILLNO = OH.BILLNO AND ORM.RCPTTYPE != 'OF' LEFT JOIN OPD_RECEIPTS ORM_RF ON ORM_RF.OPDBILLNO = OH.BILLNO AND ORM_RF.RCPTTYPE = 'OF' LEFT JOIN OPD_BILLTRN OD ON OH.BILLNO = OD.BILLNO LEFT JOIN MST_SERVICES S ON OD.SERVCODE = S.SERVCODE LEFT JOIN MST_DEPARTMENT DDM ON DDM.DEPTCODE = S.DEPTCODE LEFT JOIN DGL_TESTMASTER DM ON DM.TESTCODE = S.SERVCODE LEFT JOIN DGL_LABDEPT D ON D.LABDPTCODE = DM.LABDPTCODE LEFT JOIN MST_USERDETAILS U ON OH.CREATED_BY = U.USERID LEFT JOIN MST_DOCTORMASTER DM1 ON DM1.CODE = OH.DOCTCD INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = OH.CLNORGCODE LEFT JOIN PAYMODE PD ON PD.PAYMODEID = OH.PAYMODE LEFT JOIN PAYMODE PD_RF ON PD_RF.PAYMODEID = ORM_RF.PAYMODE WHERE OH.CLNORGCODE LIKE @hospid AND CONVERT(varchar(10), OH.BILLDATE, 120) >= @FROMDATE AND CONVERT(varchar(10), OH.BILLDATE, 120) <= @TODATE AND OH.CREATED_BY LIKE @UserId AND OH.DOCTCD LIKE @DoctCode ORDER BY D.LABDPTDESC; `;
 
     try {
-      const { records } = await executeDbQuery(sql, { FROMDATE: input.FROMDATE, TODATE: input.TODATE, UserId: `%${input.UserId}%`, Clinic_Code: `%${input.Clinic_Code}%`, DoctCode: `%${input.DoctCode || ''}%`, });
+      const { records } = await executeDbQuery(sql, { FROMDATE: input.FROMDATE, TODATE: input.TODATE, UserId: `%${input.UserId}%`, hospid: hospid ? `%${hospid}%` : "%%", DoctCode: `%${input.DoctCode || ''}%`, });
       res.json({ status: 0, result: records });
     } catch (err: any) {
       res.status(500).json({ status: 1, result: err.message });
@@ -153,7 +182,7 @@ export default class reportsController {
     const sql = ` SELECT BM.OPREGNO AS REGNO, BM.BILLNO, CONVERT(varchar(10), BM.BILLDATE, 103) AS BILLDATE, BM.PATFNAME AS Patientname, S.SERVCODE, S.SERVNAME AS Investigation, OD.AMOUNT AS TotalAmt, OD.SERDISCOUNT AS DiscAmt, OD.AMOUNT - OD.SERDISCOUNT AS Paid, 0 AS DUEAMT, (OD.PATCNAMT + OD.COMCNAMT) AS REFUND, (OD.AMOUNT - OD.SERDISCOUNT - (OD.PATCNAMT + OD.COMCNAMT)) AS NET, U.USERNAME, TM.CLINIC_NAME FROM  OPD_BILLMST BM LEFT JOIN OPD_BILLTRN OD ON BM.BILLNO = OD.BILLNO LEFT JOIN MST_SERVICES S ON OD.SERVCODE = S.SERVCODE LEFT JOIN DGL_TESTMASTER DM ON DM.TESTCODE = S.SERVCODE LEFT JOIN DGL_LABDEPT D ON D.LABDPTCODE = DM.LABDPTCODE LEFT JOIN MST_USERDETAILS U ON BM.CREATED_BY = U.USERID INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = BM.CLNORGCODE WHERE BM.CLNORGCODE LIKE @hospid AND CONVERT(varchar(10), BM.BILLDATE, 120) >= @FromDate AND CONVERT(varchar(10), BM.BILLDATE, 120) <= @ToDate AND BM.CREATED_BY LIKE @UserID ${Serv_Type_Cond} ${Serv_Code_Cond} AND BM.BILLTYPE = 'OB' ORDER BY 5`;
 
     try {
-      const { records } = await executeDbQuery(sql, { FromDate: input.FROMDATE, ToDate: input.TODATE, hospid: `%${hospid}%`, UserID: `%${input.UserId || ''}%`, Serv_Type: input.Serv_Type || '', Serv_group: input.Serv_group || '', ServCode: input.ServCode || '', });
+      const { records } = await executeDbQuery(sql, { FromDate: input.FROMDATE, ToDate: input.TODATE, hospid: hospid ? `%${hospid}%` : "%%", UserID: `%${input.UserId || ''}%`, Serv_Type: input.Serv_Type || '', Serv_group: input.Serv_group || '', ServCode: input.ServCode || '', });
 
       res.json({ status: 0, result: records });
     } catch (err: any) {
@@ -166,16 +195,15 @@ export default class reportsController {
     let hospid = '';
     let Case_Cond = "";
 
-    if (input.Clinic_Code == "") {
-
-      hospid = input.hospitalId;
-    }
-    else if (input.Clinic_Code == "001001001000") {
+    if (!input.Clinic_Code) {
+      hospid = input.hospitalId || "";
+    } else if (input.Clinic_Code === "001001001000") {
       hospid = "";
-    }
-    else {
+    } else {
       hospid = input.Clinic_Code;
     }
+
+    
     if (input.Case_NType == "Y" && input.Case_RType == "Y") {
       Case_Cond = " AND OPC.PATTYPE in('New','Old') ";
     }
@@ -189,7 +217,7 @@ export default class reportsController {
     const sql = ` select  convert(varchar(10),opc.CONSDATE,103) as CONS_DATE, opc.MEDRECNO as YHNUMBER, opc.OPDBILLNO as OPNO_Billno, OM.PATNAME, OM.MOBILENO, D.Firstname as DOCTOR_NAME,SM.Speciality_Name AS DOCT_SPEC, RF.RefDoctor_FName as Referral_Doc, case when opc.PATTYPE='New' then 'REGISTRATION' else 'REVIEW' end    VISIT_TYPE,  opc.PAIDAMT,opc.DOCTCODE,OPC.REGFEE,OPC.CONSFEE,OM.TOTALBILLAMT,OM.TOTDISCOUNT,OM.AMOUNTPAID,0 AS DUEAMOUNT,OM.RFNDAMOUNT,(OM.AMOUNTPAID-OM.RFNDAMOUNT)AS NETAMOUNT,UM.USERNAME,TM.CLINIC_NAME,PM.PAYMODE from OPD_CONSULTATION opc INNER JOIN OPD_BILLMST OM ON OM.BILLNO=OPC.OPDBILLNO left join Mst_DoctorMaster D on D.code=opc.DOCTCODE LEFT JOIN Speciality_Master SM ON SM.Speciality_ID=D.SpecializationId  left join Mst_ReferralDoctor RF on RF.RefDoct_ID=opc.REFDOCT  INNER JOIN Mst_UserDetails UM ON UM.USERID=OM.CREATED_BY  INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE=OM.CLNORGCODE INNER JOIN PayMode PM ON PM.Paymodeid=OM.PAYMODE WHERE  convert(varchar(10), OM.BILLDATE, 120) BETWEEN @FROMDATE  and  @TODATE and opc.CLNORGCODE like @hospid and opc.DOCTCODE like @DOCT_CODE  AND OM.BILLTYPE='OC' AND OM.CREATED_BY LIKE @USERID ${Case_Cond} order by convert(varchar(10), OM.BILLDATE, 112),9,6 `;
 
     try {
-      const { records } = await executeDbQuery(sql, { FROMDATE: input.FROMDATE, TODATE: input.TODATE, hospid: `%${input.hospid || ''}%`, DOCT_CODE: `%${input.DOCT_CODE}%`, USERID: `%${input.USERID || ''}%` });
+      const { records } = await executeDbQuery(sql, { FROMDATE: input.FROMDATE, TODATE: input.TODATE, hospid: hospid ? `%${hospid}%` : "%%", DOCT_CODE: `%${input.DOCT_CODE}%`, USERID: `%${input.USERID || ''}%` });
 
       res.json({ status: 0, result: records });
     } catch (err: any) {
