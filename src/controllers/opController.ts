@@ -1,7 +1,8 @@
 import express, { Application, Request, Response, Router } from "express";
 import { conpool, executeDbQuery } from "../db";
 import sql, { Numeric, query } from "mssql";
-import { VisitType, VisitTypeResponse, safeVal, PatSearchCriteria, PatientSearchObj, formatDate, safeNumber, RegistrationFee } from "./helpers";
+import { VisitType, VisitTypeResponse, safeVal, PatSearchCriteria, PatientSearchObj, formatDate, safeNumber, RegistrationFee, numberToWords, CompanyNoticeBoardRegistration } from "./helpers";
+const moment = require('moment');
 
 
 export default class opController {
@@ -13,6 +14,7 @@ export default class opController {
     this.router.get("/Duplicate", this.Check_Duplicate.bind(this));
     this.router.get("/DuplicateDoctorPatcon", this.Check_DuplicateDoctorPatcon.bind(this));
     this.router.get("/DuplicateDoctorPatcon1", this.Check_DuplicateDoctorPatcon1.bind(this));
+    this.router.get("/BindPrintvaliddays", this.BindPrintvaliddays.bind(this));
     this.router.get("/GetPaymentType1", this.GetPaymentType1.bind(this));
     this.router.get("/getFessOnDoctorCode", this.getFessOnDoctorCode.bind(this));
     this.router.get("/checkIpNo", this.checkIpNo.bind(this));
@@ -20,6 +22,8 @@ export default class opController {
     this.router.get("/GetCONSBYDEPT", this.GetCONSBYDEPT.bind(this));
     this.router.get("/getDoctorDepartment", this.getDoctorDepartment.bind(this));
     this.router.get("/getTokenNo", this.getTokenNo.bind(this));
+    this.router.get("/getClinic_Details", this.getClinic_Details.bind(this));
+    this.router.get("/getDoctorQualification", this.getDoctorQualification.bind(this));
     this.router.get("/getFacilityDefaultValues", this.getFacilityDefaultValues.bind(this));
     this.router.get("/getPatientOtherDetails", this.getPatientOtherDetails.bind(this));
     this.router.get("/GetPaymentType", this.GetPaymentType.bind(this));
@@ -27,6 +31,7 @@ export default class opController {
     this.router.get("/GetPATTYPE", this.GetPATTYPE.bind(this));
     this.router.get("/getPatCategoryDetails", this.getPatCategoryDetails.bind(this));
     this.router.get("/ServeicePageconsult", this.ServeicePageconsult.bind(this));
+    this.router.get("/bindPrintConsultationPage2", this.bindPrintConsultationPage2.bind(this));
     this.router.put("/DOCTPATCON", this.updateDOCTPATCON.bind(this));
     this.router.put("/DOCTPATCON1", this.updateDOCTPATCON1.bind(this));
     this.router.put("/PatientMaster", this.updatePatientMaster.bind(this));
@@ -651,6 +656,62 @@ export default class opController {
     }
   }
 
+  async getClinic_Details(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    const sql = `select CLINIC_NAME,ADDRESS,PHONE From tm_clinics WHERE CLINIC_CODE=@hospid`;
+
+    const params = { hospid: input.hospid}
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async getDoctorQualification(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    try {
+
+      const doctorQuery = `SELECT isnull(MobileNo,'') as MobileNo,isnull(Email,'') as Email,RoomNo, registrationNo, Qualification,isnull(Qualification1,'') as Qualification1,isnull(Qualification2,'') as Qualification2,isnull(Qualification3,'') as Qualification3,isnull(Qualification4,'') as Qualification4 FROM Mst_DoctorMaster WHERE Code=@DoctCode and status<>'C'`;
+
+      const doctorResult = await executeDbQuery(doctorQuery, { DoctCode: input.DoctCode });
+
+      let lst: string[] = [];
+
+      if (doctorResult.records.length > 0) {
+        const dr = doctorResult.records[0];
+        lst.push(
+          dr.registrationNo,
+          dr.Qualification,
+          dr.RoomNo,
+          dr.Qualification1,
+          dr.Qualification2,
+          dr.Qualification3,
+          dr.Qualification4,
+          dr.MobileNo,
+          dr.Email
+        );
+      }
+
+      const tokenQuery = `select TOKENNO from OPD_CONSULTATION where OPDBILLNO=@ConsultNo or consultno=@ConsultNo`;
+
+      const tokenResult = await executeDbQuery(tokenQuery, { ConsultNo: input.ConsultNo });
+
+      if (tokenResult.records.length > 0) {
+        lst.push(tokenResult.records[0].TOKENNO);
+      } else {
+        lst.push("");
+      }
+
+      res.json({ status: 1, d: lst });
+    } catch (err: any) {
+
+      res.status(500).json({ status: 0, error: err.message });
+    }
+  }
+
   async GetCONSBYDEPT(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
     const sql = `select CONSBYDEPT from  Mst_DoctorMaster where Status='A' and code=@DOCTCD`;
@@ -658,6 +719,32 @@ export default class opController {
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async BindPrintvaliddays(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    const sql = ` SELECT valid_days FROM Mst_ChargeSheet WHERE Doctor_ID = @Doctor_ID AND valid_days != 0 `;
+    const params = { Doctor_ID: input.doctcode };
+    const details: CompanyNoticeBoardRegistration[] = [];
+
+    try {
+      const { records } = await executeDbQuery(sql, params);
+
+      records.forEach((row: any) => {
+        const user: CompanyNoticeBoardRegistration = {};
+        user.validdays = row.valid_days?.toString() || "0";
+
+        const validDaysNum = Number(user.validdays);
+        const today = moment(input.consdate, "DD/MM/YYYY").add(validDaysNum - 1, "days");
+        user.VALIDUPTO = today.format("DD/MMM/YYYY");
+
+        details.push(user);
+      });
+
+      res.json({ status: 0, result: details });
     } catch (err: any) {
       res.status(500).json({ status: 1, result: err.message });
     }
@@ -2021,6 +2108,46 @@ export default class opController {
 
       res.json({ status: 0, d: registrationFees });
     } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async bindPrintConsultationPage2(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const query = `select mu.USERNAME,billmst.BILLDATE,billmst.BILLNO , pm.PatientMr_No,sol.Sal_Desc,(pm.FirstName +' ' +pm.MiddleName+' '+pm.LastName) AS Patient_Name,pm.Gender,pm.Age,pm.Mobile,drsol.Sal_Desc as drSol,pm.FirstName,mdept.DEPTNAME,mstdoct.Firstname as DoctName,mp.PayMode ,rfDr.RefDoctor_FName as refraldoctr,rfDrsal.Sal_Desc  as refsal from  Patient_master pm left join Mst_Department mdept on pm.Department=mdept.DEPTCODE left join Mst_DoctorMaster mstdoct on pm.Doctor_Id=mstdoct.Code left join Mst_ReferralDoctor rfDr on rfDr.RefDoct_ID=pm.ReferralDoctor_ID left join Mst_Salutation sol on sol.Sal_Code=pm.Salutation left join OPD_BILLMST billmst  on billmst.MEDRECNO=pm.PatientMr_No left join Mst_UserDetails mu on pm.CREATED_BY=mu.USERID left join PayMode mp on mp.paymodeid=billmst.PAYMODE left join Mst_Salutation drsol on drsol.Sal_Code=mstdoct.Salutation  left join Mst_Salutation rfDrsal on rfDrsal.Sal_Code=rfDr.Salutation where  pm.PatientMr_No=@PatientMr_No and billmst.billno=@billno `;
+
+    try {
+      const result = await executeDbQuery(query, {PatientMr_No: input.PatientMr_No, billno: input.billno});
+
+      const details = result.records.map((row: any) => {
+        const net = Math.round(Number(input.billamount || 0));  
+        const netWords = numberToWords(net);
+
+        return {
+          CREATED_BY: row.USERNAME,
+          BILLDATE: moment(row.BILLDATE).format("DD/MM/YYYY hh:mm A"),
+          BILLNO: row.BILLNO,
+          Sal_Desc: row.Sal_Desc,
+          PatientMr_No: row.PatientMr_No,
+          Patient_Name: row.Patient_Name,
+          Gender: row.Gender,
+          Age: row.Age,
+          Mobile: row.Mobile,
+          drSol: row.drSol,
+          Firstname: row.DoctName,
+          refsal: row.refsal,
+          RefDoctor_FName: row.refraldoctr,
+          DEPTNAME: row.DEPTNAME,
+          NETAMT: net.toFixed(2),
+          PayMode: row.PayMode,
+          NETAMTWORDS: `${netWords} Rupees only.`,
+        };
+      });
+
+      res.json({ status: 0, result: details });
+    } catch (err: any) {
+      
       res.status(500).json({ status: 1, message: err.message });
     }
   }

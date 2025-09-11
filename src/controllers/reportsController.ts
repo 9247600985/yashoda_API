@@ -3,6 +3,7 @@ import { executeDbQuery } from "../db";
 import { console } from "inspector";
 import { logInfo } from "../utilities/logger";
 import { Session } from "inspector/promises";
+import { containsSpecialCharacters } from "./helpers";
 
 export default class reportsController {
   private router: Router = express.Router();
@@ -17,6 +18,8 @@ export default class reportsController {
     this.router.get("/DeptWiseReportForAccounts", this.DeptWiseReportForAccounts.bind(this)); 
     this.router.get("/InvestigationWiseCollection", this.InvestigationWiseCollection.bind(this)); 
     this.router.get("/ConsultationWise", this.ConsultationWise.bind(this)); 
+    this.router.get("/InvestigationCountWise", this.InvestigationCountWise.bind(this)); 
+    this.router.get("/getPaymodeWiseDetails", this.getPaymodeWiseDetails.bind(this)); 
   }
 
   async AccountReport(req: Request, res: Response): Promise<void> {
@@ -151,7 +154,6 @@ export default class reportsController {
     }
   }
 
-
   async InvestigationWiseCollection(req: Request, res: Response): Promise<void> {
     const input = req.method === 'GET' ? req.query : req.body;
 
@@ -189,6 +191,7 @@ export default class reportsController {
       res.status(500).json({ status: 1, result: err.message });
     }
   }
+
   async ConsultationWise(req: Request, res: Response): Promise<void> {
     const input = req.method === 'GET' ? req.query : req.body;
 
@@ -225,6 +228,92 @@ export default class reportsController {
     }
   }
 
+  async InvestigationCountWise(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    let hospid = "";
+    let Serv_Type_Cond = "";
+    let Serv_Code_Cond = "";
+
+    if (!input.Clinic_Code) {
+      hospid = input.hospitalId || "";
+    } else if (input.Clinic_Code === "001001001000") {
+      hospid = "";
+    } else {
+      hospid = input.Clinic_Code;
+    }
+
+    if (!input.Serv_Type && !input.Serv_group) {
+      Serv_Type_Cond = " and S.SERVTYPECD not in('01','02','03') ";
+    } else if (input.Serv_Type && !input.Serv_group) {
+      Serv_Type_Cond = ` and S.SERVTYPECD='${input.Serv_Type}' `;
+    } else if (input.Serv_Type && input.Serv_group) {
+      Serv_Type_Cond = ` and S.SERVTYPECD='${input.Serv_Type}' and LD.LABDPTCODE='${input.Serv_group}' `;
+    }
+
+    if (input.ServCode) {
+      Serv_Code_Cond = ` AND S.SERVCODE='${input.ServCode}' `;
+    }
+
+    const sql = ` select   S.SERVNAME INVESTIGATION ,COUNT(D.SERVCODE) CNT,SUM(AMOUNT) Invst_Total_Amt,SUM(D.SERDISCOUNT)  Invst_Disc_Amt,SUM(D.AMOUNT - (D.SERDISCOUNT)) AS Invst_Paid_Amt,0 Invst_Due_Amt ,SUM(D.PATCNAMT + D.COMCNAMT) AS REFUND,  SUM( D.AMOUNT - (D.SERDISCOUNT) - ((D.PATCNAMT + D.COMCNAMT))) NETAMT,TM.CLINIC_NAME from OPD_BILLMST BM INNER JOIN OPD_BILLTRN D ON D.BILLNO = BM.BILLNO INNER JOIN MST_SERVICES S ON S.SERVCODE = D.SERVCODE left join DGL_TESTMASTER DM on DM.TESTCODE=S.SERVCODE LEFT JOIN DGL_LABDEPT LD ON LD.LABDPTCODE = DM.LABDPTCODE INNER JOIN Mst_UserDetails UM ON UM.USERID = BM.CREATED_BY INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE=BM.CLNORGCODE WHERE convert(varchar(10), Bm.BILLDATE, 120) between @FROMDATE and @TODATE AND BM.CLNORGCODE like @hospid AND BM.CREATED_BY LIKE @UserID ${Serv_Type_Cond} ${Serv_Code_Cond} and BM.BILLTYPE = 'OB' GROUP BY S.SERVNAME, TM.CLINIC_NAME ORDER BY 1 `;
+
+    try {
+      const { records } = await executeDbQuery(sql, { FROMDATE: input.FROMDATE, TODATE: input.TODATE, hospid: hospid ? `%${hospid}%` : "%%", UserID: `%${input.UserID || ""}%` });
+
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async getPaymodeWiseDetails(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    if (
+      containsSpecialCharacters(input.FROMDATE) ||
+      containsSpecialCharacters(input.TODATE) ||
+      containsSpecialCharacters(input.Case_CashType) ||
+      containsSpecialCharacters(input.Case_ChequeType) ||
+      containsSpecialCharacters(input.Case_CardType) ||
+      containsSpecialCharacters(input.Case_OnlineType) ||
+      containsSpecialCharacters(input.UserId) ||
+      containsSpecialCharacters(input.Clinic_Code)
+    ) {
+      res.json({ status: 1, result: [], message:"Please avoid special characters in fields" }); 
+      return;
+    }
+
+    let hospid = "";
+    if (!input.Clinic_Code) {
+      hospid = input.hospitalId || "";
+    } else if (input.Clinic_Code === "001001001000") {
+      hospid = "";
+    } else {
+      hospid = input.Clinic_Code;
+    }
+
+    let DD = "";
+    if (input.Case_CashType === "Y") DD += "'001',";
+    if (input.Case_ChequeType === "Y") DD += "'002',";
+    if (input.Case_CardType === "Y") DD += "'004','005','006',";
+    if (input.Case_OnlineType === "Y") DD += "'008',";
+
+    let PayMode_Cond = "";
+    if (DD) {
+      DD = DD.substring(0, DD.length - 1);
+      PayMode_Cond = ` AND ORM.PAYMODE in(${DD})`;
+    }
+
+    const sql = `select TM.CLINIC_NAME,UM.USERNAME, BM.MEDRECNO, BM.OPREGNO AS REGNO,BM.BILLNO,convert(varchar(10),BM.BILLDATE,103) as BILLDATE,orm.RECEIPTNO,convert(varchar(10),ORM.RECEIPTDATE,103) as RECEIPTDATE  ,BM.PATNAME AS Patientname, RF.RefDoctor_FName AS REF_DOC ,BM.TOTALBILLAMT,BM.TOTDISCOUNT,BM.AMOUNTPAID,0 AS DUEAMOUNT,0 RFNDAMOUNT,(BM.AMOUNTPAID)AS NETAMOUNT,  case when bm.paymode = '001' then bm.AMOUNTPAID else 0 end CASH, CASE WHEN BM.PAYMODE IN('004','006') THEN bm.AMOUNTPAID else 0 end CC,CASE WHEN BM.PAYMODE = '002' THEN bm.AMOUNTPAID  else 0 end Cheque, CASE WHEN BM.PAYMODE IN('005','008') THEN bm.AMOUNTPAID else 0 end ONLINE_PAYMENT from OPD_BILLMST BM inner join OPD_RECEIPTS ORM ON ORM.OPDBILLNO = BM.BILLNO left join Mst_ReferralDoctor RF on RF.RefDoct_ID = BM.REFDOCTCD INNER JOIN Mst_UserDetails UM ON UM.USERID = BM.CREATED_BY INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = BM.CLNORGCODE WHERE convert(varchar(10), Bm.BILLDATE, 120)>= @FROMDATE and convert(varchar(10), Bm.BILLDATE, 120)<= @TODATE AND BM.CREATED_BY LIKE @UserId AND BM.CLNORGCODE like @hospid ${PayMode_Cond}  and orm.RCPTTYPE != 'OF' union all select TM.CLINIC_NAME,UM.USERNAME, BM.MEDRECNO, BM.OPREGNO AS REGNO,BM.BILLNO,convert(varchar(10), BM.BILLDATE, 103) as BILLDATE,orm.RECEIPTNO ,convert(varchar(10), ORM.RECEIPTDATE, 103) as RECEIPTDATE ,BM.PATNAME AS Patientname, RF.RefDoctor_FName AS REF_DOC ,0 TOTALBILLAMT,0 TOTDISCOUNT,0 AMOUNTPAID,0 AS DUEAMOUNT, BM.RFNDAMOUNT,-1 * (orm.amount)AS NETAMOUNT,  case when ORM.paymode = '001' then - 1 * (ORM.AMOUNT) else 0 end CASH, CASE WHEN ORM.PAYMODE IN('004','006') THEN - 1 * (ORM.AMOUNT) else 0 end CC,    CASE WHEN ORM.PAYMODE = '002' THEN - 1 * (ORM.AMOUNT)  else 0 end Cheque, CASE WHEN ORM.PAYMODE IN('005','008') THEN - 1 * (ORM.AMOUNT) else 0 end ONLINE_PAYMENT from OPD_BILLMST BM inner join OPD_RECEIPTS ORM ON ORM.OPDBILLNO = BM.BILLNO left join Mst_ReferralDoctor RF on RF.RefDoct_ID = BM.REFDOCTCD INNER JOIN Mst_UserDetails UM ON UM.USERID = BM.CREATED_BY INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = ORM.CLNORGCODE WHERE convert(varchar(10), Bm.BILLDATE, 120)>= @FROMDATE and convert(varchar(10), Bm.BILLDATE, 120)<= @TODATE AND BM.CREATED_BY LIKE @UserId AND BM.CLNORGCODE like @hospid ${PayMode_Cond}   and orm.RCPTTYPE = 'OF' order by 5,6,7`;
+
+    try {
+      const { records } = await executeDbQuery(sql, { FROMDATE: input.FROMDATE, TODATE: input.TODATE, hospid: hospid ? `%${hospid}%` : "%%", UserId: `%${input.UserId || ""}%` });
+
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
 
 
 }

@@ -8,15 +8,9 @@ export const config: sql.config = {
   server: "183.82.146.20",
   port: 1466,
   database: "YASHODA_220825",
-  // user: "sa",
-  // password: "prosoft@123",
-  // server: "DESKTOP-2O02DD6",
-  // database: "YASHODA_CLINICS_250624",
-  // port: 1433,  
   options: {
     encrypt: false,
     trustServerCertificate: true,
-    // instanceName: "SQL2022",
   },
 };
 

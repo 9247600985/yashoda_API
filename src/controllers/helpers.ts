@@ -129,3 +129,68 @@ export interface RegistrationFee {
 export function safeNumber(value: any, defaultValue: number = 0): number {
   return value == null || value === "" ? defaultValue : Number(value);
 }
+
+export function containsSpecialCharacters(input: string): boolean {
+  if (!input) return false;
+  const specialCharacters = /[~`!@#$%^&*()+=\[\]{}\\|;:'",<>/?]/;
+  return specialCharacters.test(input);
+}
+
+export function numberToWords(number: number): string {
+  if (number === 0) return "zero";
+
+  if (number < 0) return "minus " + numberToWords(Math.abs(number));
+
+  let words = "";
+
+  if (Math.floor(number / 1000000) > 0) {
+    words += numberToWords(Math.floor(number / 1000000)) + " Million ";
+    number %= 1000000;
+  }
+
+  if (Math.floor(number / 100000) > 0) {
+    words += numberToWords(Math.floor(number / 100000)) + " Lakh ";
+    number %= 100000;
+  }
+
+  if (Math.floor(number / 1000) > 0) {
+    words += numberToWords(Math.floor(number / 1000)) + " Thousand ";
+    number %= 1000;
+  }
+
+  if (Math.floor(number / 100) > 0) {
+    words += numberToWords(Math.floor(number / 100)) + " Hundred ";
+    number %= 100;
+  }
+
+  if (number > 0) {
+    if (words !== "") words += "";
+
+    const unitsMap = [
+      "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven",
+      "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen",
+      "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"
+    ];
+
+    const tensMap = [
+      "Zero", "Ten", "Twenty", "Thirty", "Forty", "Fifty",
+      "Sixty", "Seventy", "Eighty", "Ninety"
+    ];
+
+    if (number < 20) {
+      words += unitsMap[number];
+    } else {
+      words += tensMap[Math.floor(number / 10)];
+      if (number % 10 > 0) {
+        words += "-" + unitsMap[number % 10];
+      }
+    }
+  }
+
+  return words.trim();
+}
+
+export interface CompanyNoticeBoardRegistration {
+  validdays?: string;
+  VALIDUPTO?: string;
+}
