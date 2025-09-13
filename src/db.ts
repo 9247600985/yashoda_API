@@ -2,23 +2,33 @@
 import sql from "mssql";
 import { logQuery, logError } from "./utilities/logger";
 
-export const config: sql.config = {
-  user: "sa",
-  password: "PROSOFT@123",
-  server: "183.82.146.20",
-  port: 1466,
-  database: "YASHODA_220825",
-  options: {
-    encrypt: false,
-    trustServerCertificate: true,
-  },
+const isLocal = true;
+
+const commonOptions = {
+  encrypt: false,
+  trustServerCertificate: true,
 };
 
-// Connection pool (shared)
+export const config: sql.config = {
+  user: "sa",
+  password: isLocal ? "prosoft@123" : "PROSOFT@123",
+  server: isLocal ? "DESKTOP-2O02DD6" : "183.82.146.20",
+  port: isLocal ? 1433 : 1466,
+  database: "YASHODA_220825",
+  options: commonOptions,
+};
+
 export const conpool = new sql.ConnectionPool(config);
 conpool.connect().catch(err => logError(`Pool connect error: ${err.message || err}`));
 
-// --- Types ---
+let pool: sql.ConnectionPool | null = null;
+
+export async function getPool(): Promise<sql.ConnectionPool> {
+  if (pool && pool.connected) return pool;
+  pool = await sql.connect(config);
+  return pool;
+}
+
 interface DbQueryResult {
   records: any[];
   rowsAffected: number[];
@@ -64,12 +74,9 @@ export async function executeDbQuery(
   }
 
   try {
-    let result;
-    if (meta.isStoredProc) {
-      result = await req.execute(query);  // ✅ Use execute for SP
-    } else {
-      result = await req.query(query);
-    }
+    const result = meta.isStoredProc
+      ? await req.execute(query)
+      : await req.query(query);
 
     logQuery({
       query: meta.query || query,

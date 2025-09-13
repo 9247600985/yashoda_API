@@ -1,7 +1,9 @@
 import express, { Application, Request, Response, Router } from "express";
+import os from "os";
 import { conpool, executeDbQuery } from "../db";
 import sql, { Numeric, query } from "mssql";
-import { VisitType, VisitTypeResponse, safeVal, PatSearchCriteria, PatientSearchObj, formatDate, safeNumber, RegistrationFee, numberToWords, CompanyNoticeBoardRegistration } from "./helpers";
+import { VisitType, VisitTypeResponse, safeVal, PatSearchCriteria, PatientSearchObj, formatDate, safeNumber, RegistrationFee, numberToWords, CompanyNoticeBoardRegistration, formatDateChange, PatDetailsFromAppointment, formatDateForDb } from "./helpers";
+import { logError } from "../utilities/logger";
 const moment = require('moment');
 
 
@@ -22,19 +24,36 @@ export default class opController {
     this.router.get("/GetCONSBYDEPT", this.GetCONSBYDEPT.bind(this));
     this.router.get("/getDoctorDepartment", this.getDoctorDepartment.bind(this));
     this.router.get("/getTokenNo", this.getTokenNo.bind(this));
+    this.router.get("/Get_Footer", this.Get_Footer.bind(this));
+    this.router.get("/checkMRStatus", this.checkMRStatus.bind(this));
     this.router.get("/getClinic_Details", this.getClinic_Details.bind(this));
     this.router.get("/getDoctorQualification", this.getDoctorQualification.bind(this));
     this.router.get("/getFacilityDefaultValues", this.getFacilityDefaultValues.bind(this));
+    this.router.get("/displaydate", this.displaydate.bind(this));
     this.router.get("/getPatientOtherDetails", this.getPatientOtherDetails.bind(this));
     this.router.get("/GetPaymentType", this.GetPaymentType.bind(this));
     this.router.get("/loadOPRefDocRefAgent", this.loadOPRefDocRefAgent.bind(this));
     this.router.get("/GetPATTYPE", this.GetPATTYPE.bind(this));
+    this.router.get("/getSecondaryDoctors", this.getSecondaryDoctors.bind(this));
     this.router.get("/getPatCategoryDetails", this.getPatCategoryDetails.bind(this));
     this.router.get("/ServeicePageconsult", this.ServeicePageconsult.bind(this));
     this.router.get("/bindPrintConsultationPage2", this.bindPrintConsultationPage2.bind(this));
+    this.router.get("/getAppointmentList", this.getAppointmentList.bind(this));
+    this.router.get("/getPatientDetailsFromAppointment", this.getPatientDetailsFromAppointment.bind(this));
+    this.router.get("/getConsultationlist", this.getConsultationlist.bind(this));
+    this.router.get("/getConsultationBillDetails", this.getConsultationBillDetails.bind(this));
+    this.router.get("/getLocalIPAddress", this.getLocalIPAddress.bind(this));
+    this.router.get("/getPublicIP", this.getPublicIP.bind(this));
+    this.router.get("/viewVisits", this.viewVisits.bind(this));
+    this.router.get("/GetPatOldData", this.GetPatOldData.bind(this));
     this.router.put("/DOCTPATCON", this.updateDOCTPATCON.bind(this));
     this.router.put("/DOCTPATCON1", this.updateDOCTPATCON1.bind(this));
     this.router.put("/PatientMaster", this.updatePatientMaster.bind(this));
+    this.router.put("/cancelConsultation", this.cancelConsultation.bind(this));
+    this.router.put("/cancelConsultation1", this.cancelConsultation1.bind(this));
+    this.router.put("/UpdateConsultation", this.UpdateConsultation.bind(this));
+    this.router.put("/UpdateConsultation1", this.UpdateConsultation1.bind(this));
+    this.router.put("/UpDatePaidCOnsDate", this.UpDatePaidCOnsDate.bind(this));
     this.router.post("/PatientMaster", this.savePatientMaster.bind(this));
     this.router.post("/Consultation", this.saveConsultation.bind(this));
     this.router.post("/BillInsert", this.generateBillInsert.bind(this));
@@ -44,6 +63,8 @@ export default class opController {
     this.router.post("/getPatientList", this.getPatientList.bind(this));
     this.router.post("/setPatientDetails", this.setPatientDetails.bind(this));
     this.router.post("/getRegFee1", this.getRegFee1.bind(this));
+    this.router.post("/savePatientDetailsWithIPAddress", this.savePatientDetailsWithIPAddress.bind(this));
+    this.router.post("/saveIPADDRESS_OPDBILLMST", this.saveIPADDRESS_OPDBILLMST.bind(this));
 
   }
 
@@ -563,6 +584,20 @@ export default class opController {
     }
   }
 
+  async getSecondaryDoctors(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const sql = `SELECT 1 SL_NO ,DOCT_CODE1, Firstname ,Qualification , Qualification1,Qualification2,Qualification3,Qualification4       FROM Primary_Secondary_doctors P ,  Mst_DoctorMaster D WHERE P.DOCT_CODE1 = D.CODE    AND P.CLINIC_CODE = @CLINIC_CODE  AND P.CONS_DOCT_CODE = @CONS_DOCT_CODE   UNION ALL SELECT 2 SL_NO ,DOCT_CODE2, Firstname ,Qualification , Qualification1,Qualification2,Qualification3,Qualification4     FROM  Primary_Secondary_doctors P, Mst_DoctorMaster D WHERE P.DOCT_CODE2 = D.CODE    AND P.CLINIC_CODE = @CLINIC_CODE  AND P.CONS_DOCT_CODE = @CONS_DOCT_CODE  UNION ALL SELECT 3 SL_NO ,DOCT_CODE3, Firstname ,Qualification , Qualification1,Qualification2,Qualification3,Qualification4     FROM  Primary_Secondary_doctors P, Mst_DoctorMaster D WHERE P.DOCT_CODE3 = D.CODE     AND P.CLINIC_CODE = @CLINIC_CODE  AND P.CONS_DOCT_CODE = @CONS_DOCT_CODE   UNION ALL SELECT 4 SL_NO ,DOCT_CODE4, Firstname ,Qualification , Qualification1,Qualification2,Qualification3,Qualification4     FROM  Primary_Secondary_doctors P, Mst_DoctorMaster D WHERE P.DOCT_CODE4 = D.CODE     AND P.CLINIC_CODE = @CLINIC_CODE  AND P.CONS_DOCT_CODE = @CONS_DOCT_CODE   UNION ALL SELECT 5 SL_NO ,DOCT_CODE5, Firstname ,Qualification , Qualification1,Qualification2,Qualification3,Qualification4     FROM  Primary_Secondary_doctors P, Mst_DoctorMaster D WHERE P.DOCT_CODE5 = D.CODE     AND P.CLINIC_CODE = @CLINIC_CODE  AND P.CONS_DOCT_CODE = @CONS_DOCT_CODE ORDER BY 1`;
+
+    const params = { CLINIC_CODE: input.CLINIC_CODE, CONS_DOCT_CODE: input.CONS_DOCT_CODE }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, result: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
   async getPatCategoryDetails(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
 
@@ -619,6 +654,28 @@ export default class opController {
     }
   }
 
+  async displaydate(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    const sql = `select PAIDCONSDATE FROM OPD_DOCTPATCON WHERE MEDRECNO=@MEDRECNO`;
+    const params = { MEDRECNO: input.MEDRECNO }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+
+      const details = records.map((row: any) => {
+        let dateObj = "";
+        if (row.PAIDCONSDATE) {
+          dateObj = formatDate(row.PAIDCONSDATE);
+
+        }
+        return { PAIDCONSDATE: dateObj };
+      });
+
+      res.json({ status: 0, result: details });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
   async GetDoctCode(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
     const sql = `SELECT DOCTCODE FROM OPD_CONSULTATION WHERE MEDRECNO=@MRNO AND OPDBILLNO=@BILLNO`;
@@ -643,6 +700,33 @@ export default class opController {
     }
   }
 
+  async Get_Footer(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    const sql = `SELECT isnull(OP_PRESC_FOOTER,'')as OP_PRESC_FOOTER FROM TM_CLINICS WHERE CLINIC_CODE=@CLINIC_CODE`;
+
+    const params = { CLINIC_CODE: input.CLINIC_CODE }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async GetPatOldData(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    const sql = `SELECT ISNULL(PATIENTMR_NO,'') AS MRNO FROM PATIENT_MASTER WHERE FIRSTNAME=@FNAME AND LASTNAME=@LNAME AND Gender=@GENDER AND convert(varchar(10), Patient_DOB,120)=@DOB AND MOBILE=@MOBILE `;
+
+    const params = { FNAME: input.FNAME, LNAME: input.LNAME, GENDER: input.GENDER, DOB: input.DOB, MOBILE: input }
+
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
   async getTokenNo(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
     const sql = `SELECT GENTOKEN FROM OPD_DOCTTOKENNO WHERE DOCTCODE=@DOCTCD AND CLNORGCODE=@HOSPID AND CONVERT(VARCHAR(10),CONSDATE,120)=CONVERT(VARCHAR(10),GETDATE(),120) `;
@@ -656,11 +740,27 @@ export default class opController {
     }
   }
 
+  async checkMRStatus(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    const sql = `SELECT count(*) FROM OPD_CONSULTATION WHERE MEDRECNO=@MRNO and status<>'C' `;
+    const sql1 = `select HospitalName from HospitalsList `;
+
+    const params = { MRNO: input.MRNO }
+    try {
+      const { records } = await executeDbQuery(sql, params);
+      const records1 = await executeDbQuery(sql1, []);
+
+      res.json({ status: 0, result: records, records1 });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
   async getClinic_Details(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
     const sql = `select CLINIC_NAME,ADDRESS,PHONE From tm_clinics WHERE CLINIC_CODE=@hospid`;
 
-    const params = { hospid: input.hospid}
+    const params = { hospid: input.hospid }
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -1140,7 +1240,7 @@ export default class opController {
         RECEIVEDON: input.RECEIVEDON,
         CONSAUTHBY: input.CONSAUTHBY,
         CREDAUTHBY: input.CREDAUTHBY,
-        DISCAUTHBY: input.DISCAUTHBY,
+        DISCAUTHBY: input.DISCAUTHBY || '',
         ADVADJAMT: input.ADVADJAMT,
         TRANCODE: input.TRANCODE,
         MATERNITY: input.MATERNITY,
@@ -1488,10 +1588,10 @@ export default class opController {
 
     try {
       await transaction.begin();
-      const spName = "Patient_Master_UPDATE";
 
-      const insertQuery = ` 
-      DECLARE @MRNO VARCHAR(50);
+      // First SP: Patient_Master_UPDATE
+      const spName = "Patient_Master_UPDATE";
+      const insertQuery = `
       EXEC ${spName}
         @OPDNum = @OPDNum,
         @PatientMr_No = @PatientMr_No,
@@ -1580,7 +1680,8 @@ export default class opController {
         @CREATED_BY = @CREATED_BY,
         @CREATED_ON = @CREATED_ON,
         @EDITED_BY = @EDITED_BY,
-        @EDITED_ON = @EDITED_ON `;
+        @EDITED_ON = @EDITED_ON;
+    `;
 
       const params = {
         OPDNum: input.OPDNum || null,
@@ -1607,7 +1708,7 @@ export default class opController {
         Address: `${input.address1} ${input.address2} ${input.address3}`,
         Patient_Category_Id: input.patcatid,
         Work_NO: input.Work_NO || null,
-        EmgConct_Name: input.EmgConct_Name,
+        EmgConct_Name: input.EmgConct_Name || null,
         EmgConct_Relation: input.EmgConct_Relation || null,
         EmgConct_TeleHome: input.EmgConct_TeleHome || null,
         EmgConct_TeleCell: input.EmgConct_TeleCell || null,
@@ -1647,7 +1748,7 @@ export default class opController {
         EmpIdCardNo: input.empidcardno,
         LetterNo: input.letterno,
         Limit: input.limit,
-        ValidDate: input.validdate,
+        ValidDate: input.validdate || null,
         Image_Name: input.imagepath || "",
         AppointmentNO: input.AppointmentNO || null,
         EXPDUEDATE: input.EXPDUEDATE || null,
@@ -1667,54 +1768,37 @@ export default class opController {
         NATLCODE: input.Nationality,
         RELGCODE: input.Religion,
         fathername: input.fathername,
-        CREATED_BY: null,
-        CREATED_ON: null,
-        EDITED_BY: input.userId,
-        EDITED_ON: input.Crated_On
+        CREATED_BY: null, CREATED_ON: null, EDITED_BY: input.userId, EDITED_ON: input.Crated_On,
       };
 
-      const { records: records1 } = await executeDbQuery(insertQuery, params, {
-        transaction: transaction,
-        query: `EXEC ${spName}`,
-        params: params
-      });
+      await executeDbQuery(insertQuery, params, { transaction });
 
+      // Second SP: USP_UPDATE_PATIENTNAME
+      const spName2 = "USP_UPDATE_PATIENTNAME";
+      const insertQuery2 = `
+      EXEC ${spName2}
+        @MRNO = @MRNO,
+        @PATIENTNAME = @PATIENTNAME,
+        @AGE = @AGE,
+        @SALUTNCODE = @SALUTNCODE,
+        @GENDER = @GENDER;
+    `;
 
-      const spName1 = "Patient_Master_UPDATE";
-      const insertQuery1 = ` 
-      DECLARE @MRNO VARCHAR(50);
-      EXEC ${spName1}
-      @MRNO = @MRNO,
-      @PATIENTNAME = @PATIENTNAME,
-      @AGE = @AGE,
-      @SALUTNCODE = @SALUTNCODE,
-      @GENDER = @GENDER` ;
-
-      const params1 = {
+      const params2 = {
         MRNO: input.mrno,
         PATIENTNAME: input.patname,
         AGE: input.age,
         SALUTNCODE: input.patsalutationid,
-        GENDER: input.gender
-      }
+        GENDER: input.gender,
+      };
 
-      const { records: records2 } = await executeDbQuery(insertQuery1, params1, {
-        transaction: transaction,
-        query: `EXEC ${spName1}`,
-        params: params1
-      });
+      await executeDbQuery(insertQuery2, params2, { transaction });
 
-      transaction.commit();
-      const MRNO = records1?.[0]?.MRNO;
+      await transaction.commit();
 
-      if (records1?.length) {
-
-        res.json({ status: 0, MRNO: MRNO });
-      } else {
-        res.json({ status: 1, message: "No data returned from SP" });
-      }
+      res.json({ status: 0, message: "Patient updated successfully" });
     } catch (err: any) {
-      transaction.rollback();
+      await transaction.rollback();
       res.status(500).json({ status: 1, message: err.message });
     }
   }
@@ -1943,7 +2027,7 @@ export default class opController {
           <td style='text-align: left;'>${dr["Patient_Name"] || ""}</td>
           <td style='text-align: left;'>${dr["Gender"] || ""}</td>
           <td style='text-align: left;'>${dr["Age"] || ""}</td>
-          <td style='text-align: left;'>${dr["Patient_DOB"] ? new Date(dr["Patient_DOB"]).toISOString().substring(0, 10) : ""}</td>
+          <td style='text-align: left;'>${dr["Patient_DOB"] ? formatDateChange(dr["Patient_DOB"]) : ""}</td>
           <td style='text-align: left;'>${dr["Mobile"] || ""}</td>
           <td style='text-align: left;'>${dr["Address1"] || ""}</td>
           <td style='text-align: left;'>${dr["fathername"] || ""}</td>
@@ -1979,14 +2063,14 @@ export default class opController {
 
       const patobj: PatientSearchObj[] = (dbRes.records || []).map((dr: any) => ({
         consultno: dr.CONSULTNO,
-        consdate: formatDate(dr.CONSDATE),
+        consdate: formatDateChange(dr.CONSDATE),
         mrno: dr.PatientMr_No,
         ipno: dr.IPNO,
         patsalutationid: dr.Salutation,
         patname: dr.Patient_Name?.toUpperCase(),
         gender: dr.Gender,
         age: dr.Age,
-        dob: formatDate(dr.Patient_DOB),
+        dob: formatDateChange(dr.Patient_DOB),
         mobile: dr.Mobile,
         telphone: dr.Telephone,
         email: dr.Email,
@@ -2026,7 +2110,7 @@ export default class opController {
         empidcardno: dr.EmpIdCardNo,
         letterno: dr.LetterNo,
         limit: dr.Limit,
-        validdate: formatDate(dr.ValidDate),
+        validdate: formatDateChange(dr.ValidDate),
         empid: dr.EmpId,
         empname: dr.EmpName,
         empreftype: dr.EmpRefType,
@@ -2047,7 +2131,7 @@ export default class opController {
         NURSCODE: dr.NURSCODE,
         NURSINGSTATION: dr.NURSINGSTATION,
         FOLIONO: dr.FOLIONO,
-        DISCHRGDT: formatDate(dr.DISCHRGDT),
+        DISCHRGDT: formatDateChange(dr.DISCHRGDT),
         OPNum: dr.OPDREGNO,
       }));
 
@@ -2059,7 +2143,7 @@ export default class opController {
   }
 
   async getRegFee1(req: Request, res: Response): Promise<void> {
-    const input = req.body.Regfee; 
+    const input = req.body.Regfee;
 
     try {
       let result = 0;
@@ -2118,10 +2202,10 @@ export default class opController {
     const query = `select mu.USERNAME,billmst.BILLDATE,billmst.BILLNO , pm.PatientMr_No,sol.Sal_Desc,(pm.FirstName +' ' +pm.MiddleName+' '+pm.LastName) AS Patient_Name,pm.Gender,pm.Age,pm.Mobile,drsol.Sal_Desc as drSol,pm.FirstName,mdept.DEPTNAME,mstdoct.Firstname as DoctName,mp.PayMode ,rfDr.RefDoctor_FName as refraldoctr,rfDrsal.Sal_Desc  as refsal from  Patient_master pm left join Mst_Department mdept on pm.Department=mdept.DEPTCODE left join Mst_DoctorMaster mstdoct on pm.Doctor_Id=mstdoct.Code left join Mst_ReferralDoctor rfDr on rfDr.RefDoct_ID=pm.ReferralDoctor_ID left join Mst_Salutation sol on sol.Sal_Code=pm.Salutation left join OPD_BILLMST billmst  on billmst.MEDRECNO=pm.PatientMr_No left join Mst_UserDetails mu on pm.CREATED_BY=mu.USERID left join PayMode mp on mp.paymodeid=billmst.PAYMODE left join Mst_Salutation drsol on drsol.Sal_Code=mstdoct.Salutation  left join Mst_Salutation rfDrsal on rfDrsal.Sal_Code=rfDr.Salutation where  pm.PatientMr_No=@PatientMr_No and billmst.billno=@billno `;
 
     try {
-      const result = await executeDbQuery(query, {PatientMr_No: input.PatientMr_No, billno: input.billno});
+      const result = await executeDbQuery(query, { PatientMr_No: input.PatientMr_No, billno: input.billno });
 
       const details = result.records.map((row: any) => {
-        const net = Math.round(Number(input.billamount || 0));  
+        const net = Math.round(Number(input.billamount || 0));
         const netWords = numberToWords(net);
 
         return {
@@ -2147,9 +2231,602 @@ export default class opController {
 
       res.json({ status: 0, result: details });
     } catch (err: any) {
-      
+
       res.status(500).json({ status: 1, message: err.message });
     }
   }
+
+  async getAppointmentList(req: Request, res: Response): Promise<void> {
+    // In C#, hospid came from Session — here you’d get it from req.session or JWT if needed
+    // const hospid = req.session?.HospitalId;
+
+    const query = `select a.VISITSTATUS,a.visitamount,a.trnumber PatientMr_No, A.AppointmentNo, AppointmentDate AppointmentDate, AppointmentTime, Patient_Name ,D.Firstname, Doctcode, visittype from TM_APPOINTMENTS A inner join Patient_Master pm on a.trnumber = pm.patientmr_no LEFT JOIN Mst_DoctorMaster D ON D.Code = A.Doctcode where convert(varchar(10), AppointmentDate, 120) between convert(varchar(10), getdate(), 120) and convert(varchar(10), getdate(), 120) and A.visitStatus in('Paid') and (consulted is null or Consulted != 'Y')  and a.ap_type='A' ORDER BY AppointmentDate`;
+
+    let table = `
+    <THead>
+      <tr class='success'>
+        <TH style='text-align: left;'>Payment Status</TH>
+        <TH style='text-align: left;'>YH No.</TH>
+        <TH style='text-align: left;'>Appointment No</TH>
+        <TH style='text-align: left;'>Date</TH>
+        <TH style='text-align: left;'>Time</TH>
+        <TH style='text-align: left;'>Patient Name</TH>
+        <TH style='text-align: left;'>Doctor Name</TH>
+        <TH style='text-align: left;'>Patient Type</TH>
+        <TH style='text-align: left;display:none'>Doctor Id</TH>
+        <TH style='text-align: left;display:none'>Visit Type</TH>
+      </tr>
+    </THead>
+    <tbody>
+  `;
+
+    try {
+      const { records } = await executeDbQuery(query, []);
+
+      for (const row of records) {
+        let visitstatus = row.VISITSTATUS;
+        if (visitstatus !== "Paid") {
+          visitstatus = "Unpaid";
+        }
+
+        table += `
+        <tr>
+          <td style='text-align: left;'>${visitstatus}</td>
+          <td style='text-align: left;'>${row.PatientMr_No ?? ""}</td>
+          <td style='text-align: left;'>${row.AppointmentNo ?? ""}</td>
+          <td style='text-align: left;'>${row.AppointmentDate ?? ""}</td>
+          <td style='text-align: left;'>${row.AppointmentTime ?? ""}</td>
+          <td style='text-align: left;'>${row.Patient_Name ?? ""}</td>
+          <td style='text-align: left;'>${row.Firstname ?? ""}</td>
+          <td style='text-align: left;'>${row.Patient_Type ?? ""}</td>
+          <td style='text-align: left;display:none'>${row.Doctcode ?? ""}</td>
+          <td style='text-align: left;display:none'>${row.visittype ?? ""}</td>
+        </tr>
+      `;
+      }
+
+      table += "</tbody>";
+
+      res.json({ status: 0, d: table });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async getPatientDetailsFromAppointment(req: Request, res: Response): Promise<void> {
+    // In C#, Appointment object is passed in — here we read from body or query
+    const input = req.method === "GET" ? req.query : req.body;
+    const appointmentNo = input.appointno;
+
+    try {
+      // Call the stored procedure
+      const { records } = await executeDbQuery(
+        "EXEC USP_GETPATDETFROMAPPOINTMENT @APPOINTMENTNO=@AppointmentNo",
+        { AppointmentNo: appointmentNo }
+      );
+
+      // Map DB rows to PatDetailsFromAppointment[]
+      const appointments: PatDetailsFromAppointment[] = records.map((r: any) => ({
+        amount: r.visitamount !== null ? Number(r.visitamount) : undefined,
+        salutation: r.Salutation ?? "",
+        patname: r.Patient_Name ?? "",
+        patfname: r.FirstName ?? "",
+        patlname: r.LastName ?? "",
+        patage: r.Age ?? "",
+        mobile: r.Mobile ?? "",
+        email: r.Email ?? "",
+        dob: formatDateChange(r.Patient_DOB) ?? "",
+        gender: r.Gender ?? "",
+        countryid: r.Country ?? "",
+        countryname: r.Country_Name ?? "",
+        stateid: r.State ?? "",
+        statename: r.State_Name ?? "",
+        districtid: r.District ?? "",
+        districtname: r.District_Name ?? "",
+        cityidid: r.City_id ?? "",
+        cityname: r.CityName ?? "",
+        patcat: r.Patient_Category_Id ?? "",
+        addr1: r.Address1 ?? "",
+        addr2: r.Address2 ?? "",
+        addr3: r.Address3 ?? "",
+        visitytype: r.VISITTYPE ?? "",
+        doctcd: r.Code ?? "",
+        doctname: r.DRNAME ?? "",
+        deptcd: r.DEPCODE ?? "",
+        deptname: r.DEPTNAME ?? ""
+      }));
+
+      // Return array like C# method
+      res.json({ status: 0, result: appointments });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async getConsultationlist(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    let totnetamt = 0,
+      totpaidamt = 0,
+      totdueamt = 0,
+      totcons = 0,
+      i = 0;
+
+    try {
+
+
+      const tempfromdate = formatDateForDb(input.fromdate);
+      const temptodate = formatDateForDb(input.todate);
+
+      const hospid = input.HOSPITALID || "";
+      const CounterID = input.COUNTERID || "OP1";
+      const USERID = input.USERID || "";
+
+      // Stored procedure call
+      const query = ` EXEC USP_GET_CONSULTATIONLIST @FROMDATE=@FROMDATE, @TODATE=@TODATE, @DOCTCODE=@DOCTCODE, @MRNO=@MRNO, @USERID=@USERID, @COUNTERID=@COUNTERID, @CLNORGCODE=@CLNORGCODE `;
+
+      const params = { FROMDATE: tempfromdate, TODATE: temptodate, DOCTCODE: input.doctcode, MRNO: input.mrno, USERID, COUNTERID: CounterID, CLNORGCODE: hospid, };
+
+      const { records } = await executeDbQuery(query, params);
+
+      let table = `
+      <thead>
+        <tr class='success'>
+          <th style='text-align: left;'>Slno</th>
+          <th style='text-align: left;'>Consulation No.</th>
+          <th style='text-align: left;'>Consulation Date</th>
+          <th style='text-align: left;display:none;'>OP Number</th>
+          <th style='text-align: left;'>YH Number</th>
+          <th style='text-align: left;'>Patient Name</th>
+          <th style='text-align: left;'>Token Number</th>
+          <th style='text-align: left;'>Age</th>
+          <th style='text-align: left;'>Sex</th>
+          <th style='text-align: left;'>Contact</th>
+          <th style='text-align: left;'>Doctor</th>
+          <th style='text-align: left;'>Visit Type</th>
+          <th style='text-align: right;'>Net Amount</th>
+          <th style='text-align: right;'>Paid Amount</th>
+          <th style='text-align: right;'>Due Amount</th>
+          <th style='text-align: left;'>Status</th>
+          <th style='text-align: left; display: none'>Bill No.</th>
+          <th style='text-align: left;'>Remarks</th>
+          <th style='text-align: left;'>UserName</th>
+        </tr>
+      </thead>
+      <tbody>
+    `;
+
+      const consList: any[] = [];
+
+      for (const dr of records) {
+        i++;
+
+        const consultation = {
+          CONSULTNO: dr.CONSULTNO,
+          CONSDATE: dr.CONSDATE ? formatDateChange(dr.CONSDATE) : "",
+          OPNUM: dr.OPDREGNO,
+          MEDRECNO: dr.MEDRECNO,
+          Patient_Name: dr.Patient_Name,
+          TOKENNO: dr.TOKENNO,
+          Age: dr.Age,
+          Gender: dr.Gender,
+          Mobile: dr.Mobile,
+          Firstname: dr.Firstname,
+          VisitType_Name: dr.VisitType_Name,
+          NETAMT: parseFloat(dr.NETAMT || 0),
+          PAIDAMT: parseFloat(dr.PAIDAMT || 0),
+          DUEAMOUNT: parseFloat(dr.DUEAMOUNT || 0),
+          STATUS: dr.STATUS,
+          OPDBILLNO: dr.OPDBILLNO,
+          PATTYPE: dr.PATTYPE,
+          CONSTYPE: dr.CONSTYPE,
+          RECEIPTNO: dr.RECEIPTNO,
+          RECEIPTDATE: dr.RECEIPTDATE ? formatDateChange(dr.RECEIPTDATE) : "",
+          REMARKS: dr.REMARKS,
+          USERNAME: dr.USERNAME,
+        };
+
+        let style1 = consultation.STATUS === "A" ? "" : "color:white !important;background-color:#ee6e73  !important;";
+
+        table += `
+        <tr style='text-align:left;'>
+          <td style='text-align:left;${style1}'>${i}</td>
+          <td style='text-align:left;${style1}'>${consultation.OPDBILLNO}</td>
+          <td style='text-align:left;${style1}'>${consultation.CONSDATE}</td>
+          <td style='text-align:left;display:none;${style1}'>${consultation.OPNUM}</td>
+          <td style='text-align:left;${style1}'>${consultation.MEDRECNO}</td>
+          <td style='text-align:left;${style1}'>${consultation.Patient_Name}</td>
+          <td style='text-align:left;${style1}'>${consultation.TOKENNO}</td>
+          <td style='text-align:left;${style1}'>${consultation.Age}</td>
+          <td style='text-align:left;${style1}'>${consultation.Gender}</td>
+          <td style='text-align:left;${style1}'>${consultation.Mobile}</td>
+          <td style='text-align:left;${style1}'>${consultation.Firstname}</td>
+          <td style='text-align:left;${style1}'>${consultation.VisitType_Name}</td>
+          <td style='text-align:right;${style1}'>${consultation.NETAMT}</td>
+          <td style='text-align:right;${style1}'>${consultation.PAIDAMT}</td>
+          <td style='text-align:right;${style1}'>${consultation.DUEAMOUNT}</td>
+          <td style='text-align:left;${style1}'>${consultation.STATUS}</td>
+          <td style='text-align:left;display:none;${style1}'>${consultation.OPDBILLNO}</td>
+          <td style='text-align:left;${style1}'>${consultation.REMARKS}</td>
+          <td style='text-align:left;${style1}'>${consultation.USERNAME}</td>
+        </tr>
+      `;
+
+        consList.push(consultation);
+        totnetamt += consultation.NETAMT;
+        totpaidamt += consultation.PAIDAMT;
+        totdueamt += consultation.DUEAMOUNT;
+        totcons++;
+      }
+
+      table += `
+      </tbody>
+      <tfoot>
+        <tr style='color:blue'>
+          <td style='text-align:left;'>Total Cons:${totcons}</td>
+          <td></td><td></td><td></td>
+          <td style='display:none;'></td>
+          <td></td><td></td><td></td><td></td>
+          <td></td><td></td>
+          <td style='text-align:left;'>Total</td>
+          <td style='text-align:right;'>${totnetamt.toFixed(2)}</td>
+          <td style='text-align:right;'>${totpaidamt.toFixed(2)}</td>
+          <td style='text-align:right;'>${totdueamt.toFixed(2)}</td>
+          <td></td><td></td><td></td><td style='display:none;'></td>
+        </tr>
+      </tfoot>
+    `;
+
+      consList.push({
+        NETAMT: totnetamt,
+        PAIDAMT: totpaidamt,
+        DUEAMOUNT: totdueamt,
+        TOTCONS: totcons,
+      });
+
+      res.json({ status: 0, table, d: consList });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async getConsultationBillDetails(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    try {
+      const hospid = input.HospitalId || "";
+      const billno = input.billno;
+
+      // Build SQL query
+      let query = `select b.REMARKS, C.DISCOUNTON,BILLNO,CASHCOUNTER,BEDCATGCD,RCPTNO ,B.MEDRECNO,B.PAYMODE, CHEQUEDDNO,CHEQUEDATE,B.BANKNAME,DOCTCD,CRDCOMPCD,B.LETTERNO, VALIDUPTO,B.PATCATG,B.TARIFFID,  C.REGFEE,C.CONSFEE,C.DISCPER,C.DISCAMT,C.NETAMT, B.COMBILLAMT,B.PATBILLAMT,C.NETAMT TOTALAMOUNT, (B.COMBILLAMT-B.COMDISCUNT) AS COMBILLAMT,(B.PATBILLAMT-B.PATDISCUNT) AS PATBILLAMT ,(C.TOTALAMT-C.DISCAMT) AS TOTALAMOUNT, B.COMAMTPAID,B.PATAMTPAID,C.PAIDAMT, C.HOSPSHARE,C.DOCTSHARE,B.CREDAUTHBY,B.DISCAUTHBY,C.VISITTYPE,C.TOKENNO,D.Firstname DOCTNAME,c.DEPTCODE,dp.DEPTNAME, d.serviceCode,(select opregfeeservcode from Mst_FacilitySetup where CLNORGCODE=@HospitalId) opregfeeservcode,t.TARIFFDESC,t.RevisionId,p.Payment_Type,ISNULL(CMP.Name,'') COMPNAME,C.CRDEMPID,B.STATUS, (B.COMBILLAMT-B.COMDISCUNT-B.COMAMTPAID-B.COMAMTRCVD) as COMPDUE, (B.PATBILLAMT-B.PATDISCUNT-B.PATAMTPAID-B.PATAMTRCVD) as PATDUE, (B.TOTALBILLAMT-B.TOTDISCOUNT-B.AMOUNTPAID-B.AMOUNTRCVD) as TOTALDUE from OPD_BILLMST B left join OPD_CONSULTATION C on  B.BILLNO = C.OPDBILLNO left join MST_TARIFFCATGORY t on t.TARIFFID=b.TARIFFID  inner join Mst_DoctorMaster d on d.code=c.DOCTCODE inner join Mst_Department dp on dp.DEPTCODE=c.DEPTCODE LEFT JOIN Company CMP ON B.CRDCOMPCD=CMP.Com_Id inner join Mst_PatientCategory p on p.PC_Code=c.PATCATG WHERE BILLNO=@billno `;
+
+      // Add org condition like in C# code
+      if (hospid && hospid !== "001001001000") {
+        query += " AND C.CLNORGCODE = @HospitalId";
+      }
+
+      const params = {
+        billno,
+        HospitalId: hospid,
+      };
+
+      const { records } = await executeDbQuery(query, params);
+
+      // Map results to match original C# return structure
+      const consList = records.map((dr: any) => ({
+        REMARKS: dr.REMARKS,
+        DISCOUNTON: dr.DISCOUNTON,
+        EMPID: dr.CRDEMPID,
+        COMPNAME: dr.COMPNAME,
+        PAYMENTTYPE: dr.Payment_Type,
+        SERVCODE: dr.serviceCode,
+        OPREGSERVCODE: dr.opregfeeservcode,
+        TARIFFDESC: dr.TARIFFDESC,
+        REVISIONID: dr.RevisionId,
+        CASHCOUNTER: dr.CASHCOUNTER,
+        BEDCATGCD: dr.BEDCATGCD,
+        DEPTCODE: dr.DEPTCODE,
+        DEPTNAME: dr.DEPTNAME,
+        DOCTNAME: dr.DOCTNAME,
+        RCPTNO: dr.RCPTNO,
+        MEDRECNO: dr.MEDRECNO,
+        PAYMODE: dr.PAYMODE,
+        CHEQUEDDNO: dr.CHEQUEDDNO,
+        CHEQUEDATE: dr.CHEQUEDATE ? formatDateChange(dr.CHEQUEDATE) : "",
+        BANKNAME: dr.BANKNAME,
+        DOCTCD: dr.DOCTCD,
+        CRDCOMPCD: dr.CRDCOMPCD,
+        LETTERNO: dr.LETTERNO,
+        VALIDUPTO: dr.VALIDUPTO ? formatDateChange(dr.VALIDUPTO) : "",
+        PATCATG: dr.PATCATG,
+        TARIFFID: dr.TARIFFID,
+        REGFEE: dr.REGFEE,
+        CONSFEE: dr.CONSFEE,
+        DISCPER: dr.DISCPER,
+        DISCAMT: dr.DISCAMT,
+        NETAMT: dr.NETAMT,
+        COMBILLAMT: dr.COMBILLAMT,
+        PATBILLAMT: dr.PATBILLAMT,
+        TOTALAMOUNT: dr.TOTALAMOUNT,
+        COMAMTPAID: dr.COMAMTPAID,
+        PATAMTPAID: dr.PATAMTPAID,
+        PAIDAMT: dr.PAIDAMT,
+        HOSPSHARE: dr.HOSPSHARE,
+        DOCTSHARE: dr.DOCTSHARE,
+        CREDAUTHBY: dr.CREDAUTHBY,
+        DISCAUTHBY: dr.DISCAUTHBY,
+        VISITTYPE: dr.VISITTYPE,
+        TOKENNO: dr.TOKENNO,
+        STATUS: dr.STATUS,
+        COMPDUE: dr.COMPDUE,
+        PATDUE: dr.PATDUE,
+        TOTALDUE: dr.TOTALDUE,
+      }));
+
+      res.json({ status: 0, result: consList });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async UpDatePaidCOnsDate(req: Request, res: Response): Promise<void> {
+    const { deptCode, doctCode, medRecNo, paidConsDate, consByDate } = req.body;
+
+    try {
+      let query = "";
+      let params: Record<string, any> = {};
+
+      if (consByDate === "Y") {
+        query = `update OPD_DOCTPATCON set PAIDCONSDATE=@paidDate where DOCTCODE in (select code from Mst_DoctorMaster where Department=@dept and CONSBYDEPT='Y' and STATUS='A') and MEDRECNO=@mrno`;
+        params = { paidDate: paidConsDate, dept: deptCode, mrno: medRecNo };
+      } else {
+        query = `update OPD_DOCTPATCON set PAIDCONSDATE=@paidDate where DOCTCODE=@doct and MEDRECNO=@mrno`;
+        params = { paidDate: paidConsDate, doct: doctCode, mrno: medRecNo };
+      }
+
+      const { rowsAffected } = await executeDbQuery(query, params);
+
+      res.json({ status: 0, message: "Success", result: rowsAffected?.[0] ?? 0 });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message, result: 0 });
+    }
+  }
+
+  async UpdateConsultation(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const pool = await conpool.connect();
+    const transaction = new sql.Transaction(pool);
+
+    try {
+      await transaction.begin();
+
+      const { rowsAffected } = await executeDbQuery("OPD_CONSULTATION_UPDATE", { ConsultationNo: input.ConsultationNum, edited_by: input.UserId }, { transaction, isStoredProc: true });
+
+      await transaction.commit();
+
+      res.json({ status: 0, message: "Success", d: rowsAffected?.[0] ?? 1 });
+
+    } catch (err: any) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackErr) {
+        res.status(500).json({ status: 1, message: err.message, result: 0 });
+        return;
+      }
+
+    }
+  }
+
+  async UpdateConsultation1(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const pool = await conpool.connect();
+    const transaction = new sql.Transaction(pool);
+
+    try {
+      await transaction.begin();
+
+      const { rowsAffected } = await executeDbQuery("OPD_CONSULTATION_UPDATE_Y", { ConsultationNo: input.ConsultationNum }, { transaction, isStoredProc: true });
+
+      await transaction.commit();
+
+      res.json({ status: 0, message: "Success", d: rowsAffected?.[0] ?? 1 });
+
+    } catch (err: any) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackErr) {
+        res.status(500).json({ status: 1, message: err.message, result: 0 });
+      }
+
+    }
+  }
+
+  async cancelConsultation1(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const pool = await conpool.connect();
+    const transaction = new sql.Transaction(pool);
+
+    try {
+      await transaction.begin();
+
+      const { rowsAffected } = await executeDbQuery("OPD_CONSULTATION_UPDATE_Y", { ConsultationNo: input.ConsultationNum }, { transaction, isStoredProc: true });
+
+      await transaction.commit();
+
+      res.json({ status: 0, message: "Success", d: rowsAffected?.[0] ?? 1 });
+
+    } catch (err: any) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackErr) {
+        res.status(500).json({ status: 1, message: err.message, result: 0 });
+      }
+
+    }
+  }
+
+  async cancelConsultation(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const pool = await conpool.connect();
+    const transaction = new sql.Transaction(pool);
+
+    try {
+      await transaction.begin();
+
+      const { rowsAffected } = await executeDbQuery("OPD_CONSULTATION_UPDATE", { ConsultationNo: input.ConsultationNum }, { transaction, isStoredProc: true });
+
+      await transaction.commit();
+
+      res.json({ status: 0, message: "Success", d: rowsAffected?.[0] ?? 1 });
+
+    } catch (err: any) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackErr) {
+        res.status(500).json({ status: 1, message: err.message, result: 0 });
+      }
+
+    }
+  }
+
+  async saveIPADDRESS_OPDBILLMST(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const pool = await conpool.connect();
+    const transaction = new sql.Transaction(pool);
+
+    try {
+      await transaction.begin();
+
+      const { rowsAffected } = await executeDbQuery("insert into OPD_BILLMST_AUDIT select *, @USERID, @USERNAME, @IPAddress, GETDAET() from OPD_BILLMST where medrecno=@MRNO and BILLNO=@BILLNO ", { USERID: input.USERID, USERNAME: input.USERNAME, IPAddress: input.IPAddress, MRNO: input.MRNO, BILLNO: input.BILLNO }, { transaction });
+
+      await transaction.commit();
+
+      res.json({ status: 0, message: "Success", d: rowsAffected?.[0] ?? 1 });
+
+    } catch (err: any) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackErr) {
+        res.status(500).json({ status: 1, message: err.message, result: 0 });
+      }
+
+    }
+  }
+
+  async savePatientDetailsWithIPAddress(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const pool = await conpool.connect();
+    const transaction = new sql.Transaction(pool);
+
+    try {
+      await transaction.begin();
+
+      const { rowsAffected } = await executeDbQuery("insert into patient_master_audit select *, @USERID @IPAddress, GETDATE(), @USERNAME from patient_master where patientmr_no=@MRNO ", { USERID: input.USERID, IPAddress: input.IPAddress, USERNAME: input.USERNAME, MRNO: input.MRNO }, { transaction });
+
+      await transaction.commit();
+
+      res.json({ status: 0, message: "Success", d: rowsAffected?.[0] ?? 1 });
+
+    } catch (err: any) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackErr) {
+        res.status(500).json({ status: 1, message: err.message, result: 0 });
+      }
+
+    }
+  }
+
+  async getLocalIPAddress(req: Request, res: Response): Promise<void> {
+    try {
+      const networkInterfaces = os.networkInterfaces();
+      let ipAddress = "";
+
+      for (const iface of Object.values(networkInterfaces)) {
+        if (!iface) continue;
+        for (const alias of iface) {
+          if (alias.family === "IPv4" && !alias.internal) {
+            ipAddress = alias.address;
+            break;
+          }
+        }
+        if (ipAddress) break;
+      }
+
+      res.json({ status: 0, d: ipAddress });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message, ip: "" });
+    }
+  }
+
+  async getPublicIP(req: Request, res: Response) {
+    try {
+      const resp = await fetch("https://api.ipify.org?format=json");
+      const data: any = await resp.json();
+      res.json({ status: 0, ip: data.ip });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async viewVisits(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    const medRecNo = input.MEDRECNO;
+
+    try {
+      // Query matches your C# logic
+      const query = `SELECT C.MEDRECNO,PM.FirstName PATNAME, PM.Patient_Category_Id, C.CONSULTNO, C.OPDBILLNO, C.RECEIPTDATE, D.FIRSTNAME,C.REGFEE,C.CONSFEE, (CASE WHEN C.VISITTYPE='1' THEN 'First Visit' WHEN C.VISITTYPE='2' THEN 'Follow-up Visit' WHEN C.VISITTYPE='3' THEN 'Cross Consultation' WHEN C.VISITTYPE='4' THEN 'Emergency Visit' END) VISITTYPE,C.REGFEE,C.CONSFEE FROM OPD_CONSULTATION C  LEFT JOIN MST_DOCTORMASTER D ON D.CODE=C.DOCTCODE LEFT JOIN PATIENT_MASTER PM ON PM.PATIENTMR_NO=C.MEDRECNO WHERE MEDRECNO=@MEDRECNO ORDER BY RECEIPTDATE`;
+
+      const { records } = await executeDbQuery(query, { medRecNo });
+
+      let sb = `
+      <thead>
+        <tr class='success'>
+          <th style='text-align: left;'>YH No.</th>
+          <th style='text-align: left;'>Patient Name</th>
+          <th style='text-align: left;'>Patient Type</th>
+          <th style='text-align: left;'>Consultation Type</th>
+          <th style='text-align: left;'>Consultation No</th>
+          <th style='text-align: left;'>Consultation Date</th>
+          <th style='text-align: left;'>Consultant Name</th>
+          <th style='text-align: left;'>Bill No.</th>
+          <th style='text-align: right;'>Reg Fee</th>
+          <th style='text-align: right;'>Cons Fee</th>
+        </tr>
+      </thead>
+      <tbody>
+    `;
+
+      for (const row of records) {
+        sb += `
+        <tr>
+          <td>${row.MEDRECNO ?? ""}</td>
+          <td>${row.PATNAME ?? ""}</td>
+          <td>${row.Patient_Category_Id ?? ""}</td>
+          <td>${row.VISITTYPE ?? ""}</td>
+          <td>${row.CONSULTNO ?? ""}</td>
+          <td>${row.RECEIPTDATE ?? ""}</td>
+          <td>${row.FIRSTNAME ?? ""}</td>
+          <td>${row.OPDBILLNO ?? ""}</td>
+          <td style='text-align: right;'>${row.REGFEE ?? ""}</td>
+          <td style='text-align: right;'>${row.CONSFEE ?? ""}</td>
+        </tr>
+      `;
+      }
+
+      sb += "</tbody>";
+
+      res.json({ status: 0, d: sb });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
 
 }

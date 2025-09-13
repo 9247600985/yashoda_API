@@ -43,34 +43,34 @@ export default class mastersController {
   }
 
   async getAgeCalculation(req: Request, res: Response): Promise<void> {
-  const input = req.method === "GET" ? req.query : req.body;
+    const input = req.method === "GET" ? req.query : req.body;
 
-  try {
-    const spName = "USP_CALCULATEAGE";
-    const sql = `EXEC ${spName} @FromDate=@FromDate, @ToDate=@ToDate`;
+    try {
+      const spName = "USP_CALCULATEAGE";
+      const sql = `EXEC ${spName} @FromDate=@FromDate, @ToDate=@ToDate`;
 
-    const params = {
-      FromDate: input.FromDate,
-      ToDate: input.ToDate
-    };
+      const params = {
+        FromDate: input.FromDate,
+        ToDate: input.ToDate
+      };
 
-    const { records } = await executeDbQuery(sql, params);
+      const { records } = await executeDbQuery(sql, params);
 
-    const appointments = records.map((r: any) => ({
-      years: r.Years?.toString() ?? "",
-      Months: r.Months?.toString() ?? "",
-      Days: r.Days?.toString() ?? ""
-    }));
+      const appointments = records.map((r: any) => ({
+        years: r.Years?.toString() ?? "",
+        Months: r.Months?.toString() ?? "",
+        Days: r.Days?.toString() ?? ""
+      }));
 
-    res.json({ status: 0, result: appointments });
-  } catch (err: any) {
-    res.status(500).json({ status: 1, result: err.message });
+      res.json({ status: 0, result: appointments });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
   }
-}
 
   async getAgeCalculation1(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
-    
+
     try {
       const sql1 = `SELECT DATEADD(YEAR, -CAST(@Years AS INT), @ToDate) AS YearDate`;
       const params1 = {
@@ -174,11 +174,11 @@ export default class mastersController {
     }
   }
 
-  async LoadDropDowns(req: Request, res: Response): Promise<void> {
+  async LoadDropDowns(req: Request, res: Response) {
     const input = req.method === "GET" ? req.query : req.body;
 
     const rawTableName = input.TableName as string;
-    const rawIdFiled = input.IdFiled as string;
+    const rawIdFiled = input.IdFiled as string; 
     const rawDescField = input.DescField as string;
     const rawWhereCond = input.WhereCond as string;
 
@@ -191,8 +191,7 @@ export default class mastersController {
       WhereCond = WhereCond.replace(/&quot;/g, "'");
     }
 
-    // Build query exactly like C#
-    let query = `SELECT ${IdFiled}, ${DescField} FROM ${TableName}`;
+    let query = `SELECT ${IdFiled} AS idField, ${DescField} AS descField FROM ${TableName}`;
     if (WhereCond && WhereCond.trim().length > 0) {
       query += ` WHERE ${WhereCond}`;
     }
@@ -200,10 +199,19 @@ export default class mastersController {
 
     try {
       const { records } = await executeDbQuery(query);
-      res.json({ status: 0, result: records });
-    } catch (err: any) {
-      res.status(500).json({ status: 1, result: err.message });
 
+      const mapped = records.map(row => ({
+        "__type": "EmptyMaterialTemplate.Login+DropDownObjects",
+        idField: row.idField ?? "",
+        descField: (row.descField ?? "").trim(),
+        TableName: TableName,
+        WhereCond: WhereCond
+      }));
+
+      res.json({ d: mapped });
+
+    } catch (err: any) {
+      res.status(500).json({ d: [], error: err.message });
     }
   }
 
@@ -271,7 +279,6 @@ export default class mastersController {
       res.status(500).json({ status: 1, result: err.message });
     }
   }
-
 
 
 }

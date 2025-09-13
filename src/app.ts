@@ -7,7 +7,7 @@ import mastersController from "./controllers/mastersController";
 import opController from "./controllers/opController";
 import numberGenController from "./controllers/numberGenController";
 import { logInfo, logError } from "./utilities/logger";
-import { conpool } from "./db";
+import { conpool, getPool } from "./db";
 import UserController from "./controllers/userController";
 
 const app: Application = express();
@@ -29,17 +29,14 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 // --- Health check ---
 app.get("/health", async (_req: Request, res: Response) => {
   try {
-    await conpool;
-    const r = await conpool.request().query("SELECT 1 AS dbStatus");
-    res.status(200).json({
-      status: "OK, DB Connected",
-      dbStatus: r.recordset[0].dbStatus
-    });
+    const pool = await getPool();
+    const r = await pool.request().query("SELECT 1 AS dbStatus");
+    res.status(200).json({ status: "0", message:"DB Connected", dbStatus: r.recordset[0].dbStatus});
   } catch (err: any) {
-    logError(`DB Connection FAIL: ${err.message}`);
-    res.status(500).json({ status: "FAIL", error: err.message });
+    res.status(500).json({ status: "1", error: err.message });
   }
 });
+
 
 // --- Controllers ---
 new UserController(apiRouter);

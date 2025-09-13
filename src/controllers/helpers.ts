@@ -109,8 +109,18 @@ export interface PatientSearchObj {
   OPNum?: string;
 }
 
-export const formatDate = (d?: Date | string): string =>
-  d ? new Date(d).toISOString().substring(0, 10) : "";
+export const formatDate = (d?: Date | string): string => {
+  if (!d) return "";
+
+  const dateObj = d instanceof Date ? d : new Date(d);
+  if (isNaN(dateObj.getTime())) return ""; 
+
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const day = String(dateObj.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`; 
+}
 
 export interface RegfeeInput {
   MedrecNo?: string;
@@ -193,4 +203,73 @@ export function numberToWords(number: number): string {
 export interface CompanyNoticeBoardRegistration {
   validdays?: string;
   VALIDUPTO?: string;
+}
+
+
+export function formatDateChange(apiDate?: string | Date | null, changedYear?: string): string {
+  if (!apiDate) return "";
+
+  let dateStr: string;
+
+  // Normalize input to string in YYYY-MM-DD
+  if (apiDate instanceof Date) {
+    dateStr = apiDate.toISOString().substring(0, 10); // "2025-09-11"
+  } else {
+    dateStr = String(apiDate);
+  }
+
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return "";
+
+  if (changedYear) {
+    parts[0] = changedYear;
+  }
+
+  const day = parts[2].padStart(2, "0");
+  const month = parts[1].padStart(2, "0");
+  const year = parts[0];
+
+  return `${day}/${month}/${year}`;
+}
+
+export function formatDateForDb(dt?: string | null): string {
+  if (!dt) return "";
+
+  if (dt.includes("/")) {
+    const [dd, mm, yyyy] = dt.split("/");
+    return `${yyyy}-${mm}-${dd}`; // dd/MM/yyyy → yyyy-MM-dd
+  }
+
+  return dt; // already yyyy-MM-dd or other acceptable format
+}
+
+
+export interface PatDetailsFromAppointment {
+  amount?: number;
+  salutation?: string;
+  patname?: string;
+  patfname?: string;
+  patlname?: string;
+  patage?: string;
+  mobile?: string;
+  email?: string;
+  dob?: string;
+  gender?: string;
+  countryid?: string;
+  countryname?: string;
+  stateid?: string;
+  statename?: string;
+  districtid?: string;
+  districtname?: string;
+  cityidid?: string;
+  cityname?: string;
+  patcat?: string;
+  addr1?: string;
+  addr2?: string;
+  addr3?: string;
+  visitytype?: string;
+  doctcd?: string;
+  doctname?: string;
+  deptcd?: string;
+  deptname?: string;
 }
