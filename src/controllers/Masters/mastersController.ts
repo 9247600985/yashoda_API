@@ -1,7 +1,6 @@
 import express, { Application, Request, Response, Router } from "express";
-import { executeDbQuery } from "../db";
-import { decodeBase64, IsBase64 } from "../utilities/base64Utils";
-import * as sql from "mssql";
+import { executeDbQuery } from "../../db";
+import { IsBase64 } from "../../utilities/base64Utils";
 
 
 export default class mastersController {

@@ -1,5 +1,5 @@
 import express, { Application, Request, Response, Router } from "express";
-import { executeDbQuery } from "../db";
+import { executeDbQuery } from "../../db";
 
 export default class numberGenController {
 

@@ -1,14 +1,16 @@
 import express, { Application, Request, Response, NextFunction, Router } from "express";
 import cors from "cors";
-import DosageController from "./controllers/dosage";
+import DosageController from "./controllers/Masters/dosage";
 import PatientQuries from "./controllers/PatientQuries";
-import reportsController from "./controllers/reportsController";
-import mastersController from "./controllers/mastersController";
-import opController from "./controllers/opController";
-import numberGenController from "./controllers/numberGenController";
+import reportsController from "./controllers/Reports/reportsController";
+import mastersController from "./controllers/Masters/mastersController";
+import consultationController from "./controllers/OP/consultationController";
+import numberGenController from "./controllers/Masters/numberGenController";
 import { logInfo, logError } from "./utilities/logger";
 import { conpool, getPool } from "./db";
 import UserController from "./controllers/userController";
+import investigationController from "./controllers/OP/investigationController";
+
 
 const app: Application = express();
 const apiRouter: Router = Router();
@@ -44,8 +46,9 @@ new DosageController(apiRouter);
 new PatientQuries(apiRouter);
 new reportsController(apiRouter);
 new mastersController(apiRouter);
-new opController(apiRouter);
 new numberGenController(apiRouter);
+new consultationController(apiRouter);
+new investigationController(apiRouter);
 
 app.use("/api", apiRouter);
 

@@ -1,13 +1,12 @@
-import express, { Application, Request, Response, Router } from "express";
+import express, { Request, Response, Router } from "express";
 import os from "os";
-import { conpool, executeDbQuery } from "../db";
-import sql, { Numeric, query } from "mssql";
-import { VisitType, VisitTypeResponse, safeVal, PatSearchCriteria, PatientSearchObj, formatDate, safeNumber, RegistrationFee, numberToWords, CompanyNoticeBoardRegistration, formatDateChange, PatDetailsFromAppointment, formatDateForDb } from "./helpers";
-import { logError } from "../utilities/logger";
+import { conpool, executeDbQuery } from "../../db";
+import sql from "mssql";
+import { VisitType, VisitTypeResponse, safeVal, PatSearchCriteria, PatientSearchObj, formatDate, safeNumber, RegistrationFee, numberToWords, CompanyNoticeBoardRegistration, formatDateChange, PatDetailsFromAppointment, formatDateForDb } from "../../utilities/helpers";
 const moment = require('moment');
 
 
-export default class opController {
+export default class consultationController {
   private router: Router = express.Router();
 
   constructor(private app: Router) {

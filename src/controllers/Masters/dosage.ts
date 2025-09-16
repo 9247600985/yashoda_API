@@ -1,6 +1,6 @@
 import express, { Application, Request, Response, Router } from "express";
-import { executeDbQuery } from "../db";
-import { authenticateToken } from "../utilities/authMiddleWare";
+import { executeDbQuery } from "../../db";
+import { authenticateToken } from "../../utilities/authMiddleWare";
 
 
 export default class DosageController {

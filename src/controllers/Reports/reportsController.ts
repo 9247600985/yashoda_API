@@ -1,9 +1,6 @@
-import express, { Application, Request, Response, Router } from "express";
-import { executeDbQuery } from "../db";
-import { console } from "inspector";
-import { logInfo } from "../utilities/logger";
-import { Session } from "inspector/promises";
-import { containsSpecialCharacters } from "./helpers";
+import express, { Request, Response, Router } from "express";
+import { executeDbQuery } from "../../db";
+import { containsSpecialCharacters } from "../../utilities/helpers";
 
 export default class reportsController {
   private router: Router = express.Router();
