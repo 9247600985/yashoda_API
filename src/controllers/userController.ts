@@ -28,7 +28,7 @@ export default class UserController {
         const payload = { userId: user.USERID, role: user.Role };
         const accessToken = generateAccessToken(payload);
         const refreshToken = generateRefreshToken(payload);
-
+        
         res.json({ status: 0, result: "Logged in successfully", accessToken, refreshToken });
       } else {
         res.json({ status: 1, result: "Login failed" });

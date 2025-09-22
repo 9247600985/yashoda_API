@@ -1,6 +1,7 @@
 import express, { Request, Response, Router } from "express";
 import { executeDbQuery } from "../../db";
 import { containsSpecialCharacters } from "../../utilities/helpers";
+import { authenticateToken } from "../../utilities/authMiddleWare";
 
 export default class reportsController {
   private router: Router = express.Router();
@@ -8,7 +9,7 @@ export default class reportsController {
   constructor(private app: Router) {
     app.use("/reports", this.router);
 
-    this.router.get("/AccountReport", this.AccountReport.bind(this)); 
+    this.router.get("/AccountReport", authenticateToken, this.AccountReport.bind(this)); 
     this.router.get("/AmbulanceDetails", this.AmbulanceDetails.bind(this)); 
     this.router.get("/BillRegisterCollectionSummary", this.BillRegisterCollectionSummary.bind(this)); 
     this.router.get("/DeptWiseCollectionSummary", this.DeptWiseCollectionSummary.bind(this)); 
