@@ -2,7 +2,7 @@
 import sql from "mssql";
 import { logQuery, logError } from "./utilities/logger";
 
-const isLocal = true;
+const isLocal = false;
 
 const commonOptions = {
   encrypt: false,

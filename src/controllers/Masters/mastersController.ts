@@ -279,5 +279,26 @@ export default class mastersController {
     }
   }
 
+}
 
+export async function fetchCurrentFinYear() {
+  const sql = ` SELECT FinYear FROM Mst_AccYear WHERE OpenStatus = 'o' AND CurrentFinancialYear = 'y'  `;
+
+  const { records } = await executeDbQuery(sql, {});
+  return records;
+}
+
+export async function fetchCurrentNumber(input: any): Promise<string> {
+  const sql = "EXEC USP_GENERATE_DOCNO @CLNGCODE, @DOCREFNO, @MODULEID, @RESULT OUTPUT";
+
+  const params = {
+    CLNGCODE: input.hospitalId,   
+    DOCREFNO: input.type,         
+    MODULEID: input.ModuleId,              
+    RESULT: { dir: "OUTPUT", type: "VarChar", length: 50 }
+  };
+
+  const { output } = await executeDbQuery(sql, params);
+
+  return output.RESULT;
 }
