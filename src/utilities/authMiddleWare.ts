@@ -27,7 +27,7 @@ export function authenticateToken(
     }
 
     req.user = decoded as JwtPayload;
-
+    
     logger.info("Token verified:", {
       userId: req.user?.userId,
       role: req.user?.role,

@@ -1,6 +1,7 @@
 import express, { Application, Request, Response, Router } from "express";
 import { executeDbQuery } from "../../db";
 import { IsBase64 } from "../../utilities/base64Utils";
+import sql from "mssql";
 
 
 export default class mastersController {
@@ -177,7 +178,7 @@ export default class mastersController {
     const input = req.method === "GET" ? req.query : req.body;
 
     const rawTableName = input.TableName as string;
-    const rawIdFiled = input.IdFiled as string; 
+    const rawIdFiled = input.IdFiled as string;
     const rawDescField = input.DescField as string;
     const rawWhereCond = input.WhereCond as string;
 
@@ -285,20 +286,17 @@ export async function fetchCurrentFinYear() {
   const sql = ` SELECT FinYear FROM Mst_AccYear WHERE OpenStatus = 'o' AND CurrentFinancialYear = 'y'  `;
 
   const { records } = await executeDbQuery(sql, {});
-  return records;
+  return records[0].FinYear;
 }
 
-export async function fetchCurrentNumber(input: any): Promise<string> {
-  const sql = "EXEC USP_GENERATE_DOCNO @CLNGCODE, @DOCREFNO, @MODULEID, @RESULT OUTPUT";
+export async function fetchCurrentNumber(  input: { hospitalId: string; type: string; ModuleId: string }, transaction?: sql.Transaction ) {
+  const sqlText = ` DECLARE @RES VARCHAR(50); EXEC USP_GENERATE_DOCNO @CLNGCODE = @CLNGCODE, @DOCREFNO = @DOCREFNO, @MODULEID = @MODULEID, @RESULT = @RES OUTPUT; SELECT @RES AS DocNo; `;
 
-  const params = {
-    CLNGCODE: input.hospitalId,   
-    DOCREFNO: input.type,         
-    MODULEID: input.ModuleId,              
-    RESULT: { dir: "OUTPUT", type: "VarChar", length: 50 }
-  };
+  const params = {CLNGCODE: input.hospitalId, DOCREFNO: input.type, MODULEID: input.ModuleId, };
 
-  const { output } = await executeDbQuery(sql, params);
-
-  return output.RESULT;
+  const out = await executeDbQuery(sqlText, params, { transaction });
+  return out.records?.[0]?.DocNo ?? null;
 }
+
+
+

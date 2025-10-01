@@ -20,16 +20,22 @@ export default class UserController {
     const query = `SELECT U.USERID, U.USERNAME, R.Role FROM MST_USERDETAILS U LEFT JOIN MST_ROLES R ON U.ROLES = R.CODE WHERE U.USERID = @userId AND U.PASSWORD = @Password AND U.STATUS = 'A'`;
     const params = { userId: input.userId, Password: encryptedPassword };
 
+    const query1=`select USERID,USERNAME,ROLES,HOSPITALNAME,CLNORGCODE,MOBILE from Mst_UserDetails where (USERID=@userId or Mobile=@userId) and PASSWORD=@Password AND STATUS='A' `;
+
+    const params1={userId: input.userId, Password: encryptedPassword};
+
     try {
       const result = await executeDbQuery(query, params);
+      const sessions = await executeDbQuery(query1, params1);
       const user = result.records?.[0];
 
       if (user) {
         const payload = { userId: user.USERID, role: user.Role };
         const accessToken = generateAccessToken(payload);
         const refreshToken = generateRefreshToken(payload);
+         
+        res.json({ status: 0, result: "Logged in successfully", accessToken, refreshToken, SessionValues:sessions });
         
-        res.json({ status: 0, result: "Logged in successfully", accessToken, refreshToken });
       } else {
         res.json({ status: 1, result: "Login failed" });
       }
