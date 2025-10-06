@@ -48,7 +48,7 @@ new reportsController(apiRouter);
 new mastersController(apiRouter);
 new numberGenController(apiRouter);
 new consultationController(apiRouter);
-new investigationController(apiRouter);
+// new investigationController(apiRouter);
 
 app.use("/api", apiRouter);
 

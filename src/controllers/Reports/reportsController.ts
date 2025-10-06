@@ -10,14 +10,14 @@ export default class reportsController {
     app.use("/reports", this.router);
 
     this.router.get("/AccountReport", authenticateToken, this.AccountReport.bind(this)); 
-    this.router.get("/AmbulanceDetails", this.AmbulanceDetails.bind(this)); 
-    this.router.get("/BillRegisterCollectionSummary", this.BillRegisterCollectionSummary.bind(this)); 
-    this.router.get("/DeptWiseCollectionSummary", this.DeptWiseCollectionSummary.bind(this)); 
-    this.router.get("/DeptWiseReportForAccounts", this.DeptWiseReportForAccounts.bind(this)); 
-    this.router.get("/InvestigationWiseCollection", this.InvestigationWiseCollection.bind(this)); 
-    this.router.get("/ConsultationWise", this.ConsultationWise.bind(this)); 
-    this.router.get("/InvestigationCountWise", this.InvestigationCountWise.bind(this)); 
-    this.router.get("/getPaymodeWiseDetails", this.getPaymodeWiseDetails.bind(this)); 
+    this.router.get("/AmbulanceDetails", authenticateToken, this.AmbulanceDetails.bind(this)); 
+    this.router.get("/BillRegisterCollectionSummary", authenticateToken, this.BillRegisterCollectionSummary.bind(this)); 
+    this.router.get("/DeptWiseCollectionSummary", authenticateToken, this.DeptWiseCollectionSummary.bind(this)); 
+    this.router.get("/DeptWiseReportForAccounts", authenticateToken, this.DeptWiseReportForAccounts.bind(this)); 
+    this.router.get("/InvestigationWiseCollection", authenticateToken, this.InvestigationWiseCollection.bind(this)); 
+    this.router.get("/ConsultationWise", authenticateToken, this.ConsultationWise.bind(this)); 
+    this.router.get("/InvestigationCountWise", authenticateToken, this.InvestigationCountWise.bind(this)); 
+    this.router.get("/getPaymodeWiseDetails", authenticateToken, this.getPaymodeWiseDetails.bind(this)); 
   }
 
   async AccountReport(req: Request, res: Response): Promise<void> {
