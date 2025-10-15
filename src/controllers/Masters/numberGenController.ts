@@ -38,7 +38,7 @@ export default class numberGenController {
         const prefix = input.prefix as string;
 
         try {
-           
+
             const sql = ` DECLARE @RES VARCHAR(50); EXEC USP_GENERATECOUNT_WEXT @prefix = @prefix, @CLNORGCODE = @CLNORGCODE, @finalnumber = @RES OUTPUT; SELECT @RES AS Result; `;
 
             const { records } = await executeDbQuery(sql, { prefix: input.prefix, CLNORGCODE: input.hospitalId });

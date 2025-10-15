@@ -17,6 +17,9 @@ export default class mastersController {
     this.router.get("/GenderFromSalutation", this.getGenderFromSalutation.bind(this));
     this.router.get("/AgeCalculation1", this.getAgeCalculation1.bind(this));
     this.router.get("/AgeCalculation", this.getAgeCalculation.bind(this));
+    this.router.get("/loadRevision", this.loadRevision.bind(this));
+    this.router.get("/getHospData", this.getHospData.bind(this));
+    this.router.get("/getHospDataByCounter", this.getHospDataByCounter.bind(this));
 
   }
 
@@ -130,14 +133,13 @@ export default class mastersController {
     };
 
     if (WhereCondRaw) {
-      const cleaned = WhereCondRaw.replace(/&quot;/g, "'").trim().toLowerCase();
-
-      if (/^status\s*=\s*'a'(\s+and\s+(country_id|state_id|district_id|District_ID|CLNORGCODE)\s*=\s*'\w+')?$/i.test(cleaned)) {
-        whereSQL = ` AND ${cleaned}`;
-      } else {
+      const cleaned = WhereCondRaw.replace(/&quot;/g, "'").trim();
+      // basic SQL injection protection
+      if (cleaned.toUpperCase().includes("DROP") || cleaned.toUpperCase().includes("DELETE")) {
         res.status(400).json({ status: 1, result: "Invalid WHERE condition" });
         return;
       }
+      whereSQL = ` AND ${cleaned}`;
     }
 
     const sql = ` SELECT ${IdFiled} AS Code, ${DescField} AS Name FROM ${TableName} WHERE 1=1 AND ( ${IdFiled} LIKE @SearchValue OR UPPER(${DescField}) LIKE UPPER(@SearchValue) ) ${whereSQL} ORDER BY ${DescField} `;
@@ -280,6 +282,119 @@ export default class mastersController {
     }
   }
 
+  async loadRevision(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const sql = `select distinct SEQID,TARIFFID,Revision_id,TARIFFDISCPERC  from MST_COMPRULETRN where COMPRULEGRP='TBP' and CRDCOMPCODE=@compId  order by SEQID asc`;
+    const params = { compId: input.compId };
+
+    try {
+      const { records } = await executeDbQuery(sql, params);
+
+      let sb = `
+      <thead>
+        <tr>
+          <th>S.No</th>
+          <th>TariffId</th>
+          <th>RevisionId</th>
+          <th>TariffDiscount</th>
+        </tr>
+      </thead>
+      <tbody>
+    `;
+
+      records.forEach((row: any) => {
+        sb += `
+        <tr>
+          <td>${row.SEQID}</td>
+          <td>${row.TARIFFID}</td>
+          <td>${row.Revision_id}</td>
+          <td>${row.TARIFFDISCPERC}</td>
+        </tr>
+      `;
+      });
+
+      sb += "</tbody>";
+
+      // Return same structure as ASP.NET (response.d)
+      res.json({ d: sb });
+
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async getHospData(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    try {
+      const hospitalId = input.HospitalId || "";
+
+      if (!hospitalId) {
+        res.status(401).json({ status: 1, result: "HospitalId not found in session" });
+        return;
+      }
+
+      const sql = "EXEC sp_getHospitalId @hospitalId=@hospitalId";
+      const params = { hospitalId };
+
+      const { records } = await executeDbQuery(sql, params);
+
+      const listHospAddress = records.map((r: any) => ({
+        Hospital_Id: r.Hospital_Id || "",
+        HospitalName: r.HospitalName || "",
+        address1: r.address1 || "",
+        address2: r.address2 || "",
+        address3: r.address3 || "",
+        Phone_No: r.Phone_No || "",
+        EMail: r.EMail || "",
+        Website: r.Website || "",
+        Photo: r.photo || "",
+        NanoName: r.NanoName || "",
+        GstNo: r.GSTNO || "",
+        DlNo: r.DLNO || ""
+      }));
+
+      res.json({ status: 0, d: listHospAddress });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async getHospDataByCounter(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    let counterId = input.counterId || "";
+    const hospitalId = input.HospitalId || "";
+
+    try {
+      const specialCharRegex = /[^a-zA-Z0-9_-]/;
+      if (specialCharRegex.test(counterId)) {
+        res.status(401).json({ status: 1, d: [], result: "Invalid counterId" });
+        return;
+      }
+      if (counterId === "") {
+        counterId = "OP1";
+      }
+
+      const sql = `select HEADERNAME,NANONAME,ADDRESS,MOBILE,EMAIL from mst_cashcounter where CashCounter_Code=@CashCounter_Code and CLNORGCODE=@CLNORGCODE and Status='A'`;
+
+      const params = { counterId, hospitalId };
+
+      const { records } = await executeDbQuery(sql, params);
+
+      const listHospAddress = records.map((r: any) => ({
+        HospitalName: r.HEADERNAME || "",
+        Phone_No: r.MOBILE || "",
+        EMail: r.EMAIL || "",
+        NanoName: r.NANONAME || "",
+        address1: r.ADDRESS || "",
+      }));
+
+      res.json({ status: 0, d: listHospAddress });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
 }
 
 export async function fetchCurrentFinYear() {
@@ -289,12 +404,13 @@ export async function fetchCurrentFinYear() {
   return records[0].FinYear;
 }
 
-export async function fetchCurrentNumber(  input: { hospitalId: string; type: string; ModuleId: string }, transaction?: sql.Transaction ) {
+export async function fetchCurrentNumber(input: { hospitalId: string; type: string; ModuleId: string }, transaction?: sql.Transaction) {
   const sqlText = ` DECLARE @RES VARCHAR(50); EXEC USP_GENERATE_DOCNO @CLNGCODE = @CLNGCODE, @DOCREFNO = @DOCREFNO, @MODULEID = @MODULEID, @RESULT = @RES OUTPUT; SELECT @RES AS DocNo; `;
 
-  const params = {CLNGCODE: input.hospitalId, DOCREFNO: input.type, MODULEID: input.ModuleId, };
+  const params = { CLNGCODE: input.hospitalId, DOCREFNO: input.type, MODULEID: input.ModuleId, };
 
   const out = await executeDbQuery(sqlText, params, { transaction });
+  // console.log(out.records?.[0]?.DocNo);
   return out.records?.[0]?.DocNo ?? null;
 }
 

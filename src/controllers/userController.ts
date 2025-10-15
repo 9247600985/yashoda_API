@@ -20,9 +20,9 @@ export default class UserController {
     const query = `SELECT U.USERID, U.USERNAME, R.Role FROM MST_USERDETAILS U LEFT JOIN MST_ROLES R ON U.ROLES = R.CODE WHERE U.USERID = @userId AND U.PASSWORD = @Password AND U.STATUS = 'A'`;
     const params = { userId: input.userId, Password: encryptedPassword };
 
-    const query1=`select USERID,USERNAME,ROLES,HOSPITALNAME,CLNORGCODE,MOBILE from Mst_UserDetails where (USERID=@userId or Mobile=@userId) and PASSWORD=@Password AND STATUS='A' `;
+    const query1=`select  UM.USERID, UM.USERNAME, UM.ROLES, UM.MOBILE, UL.CLINICID as CLNORGCODE, TM.CLINIC_NAME as HOSPITALNAME from MST_CLINICTOUSERLINK  UL  inner join Mst_UserDetails UM ON UM.USERID = UL.USERID INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = UL.CLINICID where UL.userid = @userId ORDER BY UL.CLINICID `;
 
-    const params1={userId: input.userId, Password: encryptedPassword};
+    const params1={userId: input.userId};
 
     try {
       const result = await executeDbQuery(query, params);

@@ -3,6 +3,7 @@ import os from "os";
 import { conpool, executeDbQuery } from "../../db";
 import sql from "mssql";
 import { VisitType, VisitTypeResponse, safeVal, PatSearchCriteria, PatientSearchObj, formatDate, safeNumber, RegistrationFee, numberToWords, CompanyNoticeBoardRegistration, formatDateChange, PatDetailsFromAppointment, formatDateForDb } from "../../utilities/helpers";
+import { authenticateToken } from "../../utilities/authMiddleWare";
 const moment = require('moment');
 
 
@@ -10,60 +11,60 @@ export default class consultationController {
   private router: Router = express.Router();
 
   constructor(private app: Router) {
-    app.use("/op", this.router);
+    app.use("/op", authenticateToken, this.router);
 
-    this.router.get("/Duplicate", this.Check_Duplicate.bind(this));
-    this.router.get("/DuplicateDoctorPatcon", this.Check_DuplicateDoctorPatcon.bind(this));
-    this.router.get("/DuplicateDoctorPatcon1", this.Check_DuplicateDoctorPatcon1.bind(this));
-    this.router.get("/BindPrintvaliddays", this.BindPrintvaliddays.bind(this));
-    this.router.get("/GetPaymentType1", this.GetPaymentType1.bind(this));
-    this.router.get("/getFessOnDoctorCode", this.getFessOnDoctorCode.bind(this));
-    this.router.get("/checkIpNo", this.checkIpNo.bind(this));
-    this.router.get("/GetDoctCode", this.GetDoctCode.bind(this));
-    this.router.get("/GetCONSBYDEPT", this.GetCONSBYDEPT.bind(this));
-    this.router.get("/getDoctorDepartment", this.getDoctorDepartment.bind(this));
-    this.router.get("/getTokenNo", this.getTokenNo.bind(this));
-    this.router.get("/Get_Footer", this.Get_Footer.bind(this));
-    this.router.get("/checkMRStatus", this.checkMRStatus.bind(this));
-    this.router.get("/getClinic_Details", this.getClinic_Details.bind(this));
-    this.router.get("/getDoctorQualification", this.getDoctorQualification.bind(this));
-    this.router.get("/getFacilityDefaultValues", this.getFacilityDefaultValues.bind(this));
-    this.router.get("/displaydate", this.displaydate.bind(this));
-    this.router.get("/getPatientOtherDetails", this.getPatientOtherDetails.bind(this));
-    this.router.get("/GetPaymentType", this.GetPaymentType.bind(this));
-    this.router.get("/loadOPRefDocRefAgent", this.loadOPRefDocRefAgent.bind(this));
-    this.router.get("/GetPATTYPE", this.GetPATTYPE.bind(this));
-    this.router.get("/getSecondaryDoctors", this.getSecondaryDoctors.bind(this));
-    this.router.get("/getPatCategoryDetails", this.getPatCategoryDetails.bind(this));
-    this.router.get("/ServeicePageconsult", this.ServeicePageconsult.bind(this));
-    this.router.get("/bindPrintConsultationPage2", this.bindPrintConsultationPage2.bind(this));
-    this.router.get("/getAppointmentList", this.getAppointmentList.bind(this));
-    this.router.get("/getPatientDetailsFromAppointment", this.getPatientDetailsFromAppointment.bind(this));
-    this.router.get("/getConsultationlist", this.getConsultationlist.bind(this));
-    this.router.get("/getConsultationBillDetails", this.getConsultationBillDetails.bind(this));
-    this.router.get("/getLocalIPAddress", this.getLocalIPAddress.bind(this));
-    this.router.get("/getPublicIP", this.getPublicIP.bind(this));
-    this.router.get("/viewVisits", this.viewVisits.bind(this));
-    this.router.get("/GetPatOldData", this.GetPatOldData.bind(this));
-    this.router.put("/DOCTPATCON", this.updateDOCTPATCON.bind(this));
-    this.router.put("/DOCTPATCON1", this.updateDOCTPATCON1.bind(this));
-    this.router.put("/PatientMaster", this.updatePatientMaster.bind(this));
-    this.router.put("/cancelConsultation", this.cancelConsultation.bind(this));
-    this.router.put("/cancelConsultation1", this.cancelConsultation1.bind(this));
-    this.router.put("/UpdateConsultation", this.UpdateConsultation.bind(this));
-    this.router.put("/UpdateConsultation1", this.UpdateConsultation1.bind(this));
-    this.router.put("/UpDatePaidCOnsDate", this.UpDatePaidCOnsDate.bind(this));
-    this.router.post("/PatientMaster", this.savePatientMaster.bind(this));
-    this.router.post("/Consultation", this.saveConsultation.bind(this));
-    this.router.post("/BillInsert", this.generateBillInsert.bind(this));
-    this.router.post("/DOCTPATCON", this.saveDOCTPATCON.bind(this));
-    this.router.post("/getCurrentVisitType", this.getCurrentVisitType.bind(this));
-    this.router.post("/getCurrentVisitType1", this.getCurrentVisitType1.bind(this));
-    this.router.post("/getPatientList", this.getPatientList.bind(this));
-    this.router.post("/setPatientDetails", this.setPatientDetails.bind(this));
-    this.router.post("/getRegFee1", this.getRegFee1.bind(this));
-    this.router.post("/savePatientDetailsWithIPAddress", this.savePatientDetailsWithIPAddress.bind(this));
-    this.router.post("/saveIPADDRESS_OPDBILLMST", this.saveIPADDRESS_OPDBILLMST.bind(this));
+    this.router.get("/Duplicate", authenticateToken, this.Check_Duplicate.bind(this));
+    this.router.get("/DuplicateDoctorPatcon", authenticateToken, this.Check_DuplicateDoctorPatcon.bind(this));
+    this.router.get("/DuplicateDoctorPatcon1", authenticateToken, this.Check_DuplicateDoctorPatcon1.bind(this));
+    this.router.get("/BindPrintvaliddays", authenticateToken, this.BindPrintvaliddays.bind(this));
+    this.router.get("/GetPaymentType1", authenticateToken, this.GetPaymentType1.bind(this));
+    this.router.get("/getFessOnDoctorCode", authenticateToken, this.getFessOnDoctorCode.bind(this));
+    this.router.get("/checkIpNo", authenticateToken, this.checkIpNo.bind(this));
+    this.router.get("/GetDoctCode", authenticateToken, this.GetDoctCode.bind(this));
+    this.router.get("/GetCONSBYDEPT", authenticateToken, this.GetCONSBYDEPT.bind(this));
+    this.router.get("/getDoctorDepartment", authenticateToken, this.getDoctorDepartment.bind(this));
+    this.router.get("/getTokenNo", authenticateToken, this.getTokenNo.bind(this));
+    this.router.get("/Get_Footer", authenticateToken, this.Get_Footer.bind(this));
+    this.router.get("/checkMRStatus", authenticateToken, this.checkMRStatus.bind(this));
+    this.router.get("/getClinic_Details", authenticateToken, this.getClinic_Details.bind(this));
+    this.router.get("/getDoctorQualification", authenticateToken, this.getDoctorQualification.bind(this));
+    this.router.get("/getFacilityDefaultValues", authenticateToken, this.getFacilityDefaultValues.bind(this));
+    this.router.get("/displaydate", authenticateToken, this.displaydate.bind(this));
+    this.router.get("/getPatientOtherDetails", authenticateToken, this.getPatientOtherDetails.bind(this));
+    this.router.get("/GetPaymentType", authenticateToken, this.GetPaymentType.bind(this));
+    this.router.get("/loadOPRefDocRefAgent", authenticateToken, this.loadOPRefDocRefAgent.bind(this));
+    this.router.get("/GetPATTYPE", authenticateToken, this.GetPATTYPE.bind(this));
+    this.router.get("/getSecondaryDoctors", authenticateToken, this.getSecondaryDoctors.bind(this));
+    this.router.get("/getPatCategoryDetails", authenticateToken, this.getPatCategoryDetails.bind(this));
+    this.router.get("/ServeicePageconsult", authenticateToken, this.ServeicePageconsult.bind(this));
+    this.router.get("/bindPrintConsultationPage2", authenticateToken, this.bindPrintConsultationPage2.bind(this));
+    this.router.get("/getAppointmentList", authenticateToken, this.getAppointmentList.bind(this));
+    this.router.get("/getPatientDetailsFromAppointment", authenticateToken, this.getPatientDetailsFromAppointment.bind(this));
+    this.router.get("/getConsultationlist", authenticateToken, this.getConsultationlist.bind(this));
+    this.router.get("/getConsultationBillDetails", authenticateToken, this.getConsultationBillDetails.bind(this));
+    this.router.get("/getLocalIPAddress", authenticateToken, this.getLocalIPAddress.bind(this));
+    this.router.get("/getPublicIP", authenticateToken, this.getPublicIP.bind(this));
+    this.router.get("/viewVisits", authenticateToken, this.viewVisits.bind(this));
+    this.router.get("/GetPatOldData", authenticateToken, this.GetPatOldData.bind(this));
+    this.router.put("/DOCTPATCON", authenticateToken, this.updateDOCTPATCON.bind(this));
+    this.router.put("/DOCTPATCON1", authenticateToken, this.updateDOCTPATCON1.bind(this));
+    this.router.put("/PatientMaster", authenticateToken, this.updatePatientMaster.bind(this));
+    this.router.put("/cancelConsultation", authenticateToken, this.cancelConsultation.bind(this));
+    this.router.put("/cancelConsultation1", authenticateToken, this.cancelConsultation1.bind(this));
+    this.router.put("/UpdateConsultation", authenticateToken, this.UpdateConsultation.bind(this));
+    this.router.put("/UpdateConsultation1", authenticateToken, this.UpdateConsultation1.bind(this));
+    this.router.put("/UpDatePaidCOnsDate", authenticateToken, this.UpDatePaidCOnsDate.bind(this));
+    this.router.post("/PatientMaster", authenticateToken, this.savePatientMaster.bind(this));
+    this.router.post("/Consultation", authenticateToken, this.saveConsultation.bind(this));
+    this.router.post("/BillInsert", authenticateToken, this.generateBillInsert.bind(this));
+    this.router.post("/DOCTPATCON", authenticateToken, this.saveDOCTPATCON.bind(this));
+    this.router.post("/getCurrentVisitType", authenticateToken, this.getCurrentVisitType.bind(this));
+    this.router.post("/getCurrentVisitType1", authenticateToken, this.getCurrentVisitType1.bind(this));
+    this.router.post("/getPatientList", authenticateToken, this.getPatientList.bind(this));
+    this.router.post("/setPatientDetails", authenticateToken, this.setPatientDetails.bind(this));
+    this.router.post("/getRegFee1", authenticateToken, this.getRegFee1.bind(this));
+    this.router.post("/savePatientDetailsWithIPAddress", authenticateToken, this.savePatientDetailsWithIPAddress.bind(this));
+    this.router.post("/saveIPADDRESS_OPDBILLMST", authenticateToken, this.saveIPADDRESS_OPDBILLMST.bind(this));
 
   }
 
@@ -2702,7 +2703,7 @@ export default class consultationController {
       await transaction.begin();
 
       const query = "INSERT INTO OPD_BILLMST_AUDIT (CLNORGCODE, FINYEAR, CASHCOUNTER, BILLTYPE, BILLNO, BEDCATGCD, RCPTNO, OPREGNO, MEDRECNO, BILLDATE, SALUTNCODE, PATNAME, PATFNAME, PATMNAME, PATLNAME, PATSURNAME, AGE, SEX, ADDRESS1, ADDRESS2, ADDRESS3, CITYCODE, DISTRICTCODE, STATECODE, COUNTRYCODE, PINCODE, MOBILENO, PAYMODE, CHEQUEDDNO, CHEQUEDATE, BANKNAME, REMARKS, REFBILLNO, REFDOCTCD, DOCTCD, CRDCOMPCD, LETTERNO, VALIDUPTO, DISPNO, DISPDATE, TOKENNO, TARIFFID, TOTCOVAMT, TOTUNCOVAMT, TOTSERVAMT, PATBILLAMT, PATDISCUNT, PATAMTPAID, PATAMTRCVD, PATCNAMT, PATRFNDAMT, COMBILLAMT, COMDISCUNT, COMAMTPAID, COMAMTRCVD, COMCNAMT, COMRFNDAMT, CREDAUTHBY, DISCAUTHBY, BILLSTAT, DRAWNON, PATCATG, CONSCATG, EMPID, EMPCODE, CLINICCODE, FUNDSOURCE, DEPTCODE, OPCONSNO, OPCONSAMT, OPREGFEE, COMPRCPT, POSTFLAG, NETAMOUNT, AMOUNTPAID, AMOUNTRCVD, CNAMOUNT, RFNDAMOUNT, TOTDISCOUNT, TOTALBILLAMT, ADDR4, ADDR5, CASETYPE, AUTHTRANID, REQUESTNO, CASHCOLL, EXMPTNO, ADVADJAMT, TRANCODE, SCROLLNO, EMERGENCYN, PATPHONE, COMPSTATUS, DISALOWAMT, BILLSOURCE, MATERNYN, EXPDUEDATE, IPNO, WRITOFFAMT, TAXAMT, OTEXPENTYN, TOTSRVTAX, SERVTAXON, SRVTAXAMT, EDUCESAMT, SHECESAMT, DEPTYPE, INSCOMPCD, INTLUPLDYN, ALLWCASHYN, SNCTPRFYN, SNCTPROOF, PISUID, PISPWD, DOCTPOST, LEDGPOST, POSTDATE, CREATED_BY, CREATED_ON, EDITED_BY, EDITED_ON, CANCELDBY, CANCELDON, STATUS, CONSTYPE, WardNo, BedNO, RevisionId, OPDREGNO, DISCCATG, ReferralAgent_ID, USERID, USERNAME, SYSTEM_IPADRESS, INSERTED_ON) SELECT CLNORGCODE, FINYEAR, CASHCOUNTER, BILLTYPE, BILLNO, BEDCATGCD, RCPTNO, OPREGNO, MEDRECNO, BILLDATE, SALUTNCODE, PATNAME, PATFNAME, PATMNAME, PATLNAME, PATSURNAME, AGE, SEX, ADDRESS1, ADDRESS2, ADDRESS3, CITYCODE, DISTRICTCODE, STATECODE, COUNTRYCODE, PINCODE, MOBILENO, PAYMODE, CHEQUEDDNO, CHEQUEDATE, BANKNAME, REMARKS, REFBILLNO, REFDOCTCD, DOCTCD, CRDCOMPCD, LETTERNO, VALIDUPTO, DISPNO, DISPDATE, TOKENNO, TARIFFID, TOTCOVAMT, TOTUNCOVAMT, TOTSERVAMT, PATBILLAMT, PATDISCUNT, PATAMTPAID, PATAMTRCVD, PATCNAMT, PATRFNDAMT, COMBILLAMT, COMDISCUNT, COMAMTPAID, COMAMTRCVD, COMCNAMT, COMRFNDAMT, CREDAUTHBY, DISCAUTHBY, BILLSTAT, DRAWNON, PATCATG, CONSCATG, EMPID, EMPCODE, CLINICCODE, FUNDSOURCE, DEPTCODE, OPCONSNO, OPCONSAMT, OPREGFEE, COMPRCPT, POSTFLAG, NETAMOUNT, AMOUNTPAID, AMOUNTRCVD, CNAMOUNT, RFNDAMOUNT, TOTDISCOUNT, TOTALBILLAMT, ADDR4, ADDR5, CASETYPE, AUTHTRANID, REQUESTNO, CASHCOLL, EXMPTNO, ADVADJAMT, TRANCODE, SCROLLNO, EMERGENCYN, PATPHONE, COMPSTATUS, DISALOWAMT, BILLSOURCE, MATERNYN, EXPDUEDATE, IPNO, WRITOFFAMT, TAXAMT, OTEXPENTYN, TOTSRVTAX, SERVTAXON, SRVTAXAMT, EDUCESAMT, SHECESAMT, DEPTYPE, INSCOMPCD, INTLUPLDYN, ALLWCASHYN, SNCTPRFYN, SNCTPROOF, PISUID, PISPWD, DOCTPOST, LEDGPOST, POSTDATE, CREATED_BY, CREATED_ON, EDITED_BY, EDITED_ON, CANCELDBY, CANCELDON, STATUS, CONSTYPE, WardNo, BedNO, RevisionId, OPDREGNO, DISCCATG, ReferralAgent_ID, @USERID, @USERNAME, @IPAddress, GETDATE() from OPD_BILLMST where medrecno=@MRNO and BILLNO=@BILLNO";
-      
+
       const params = { USERID: input.USERID, USERNAME: input.USERNAME, IPAddress: input.IPAddress, MRNO: input.MRNO, BILLNO: input.BILLNO };
 
       const { rowsAffected } = await executeDbQuery(query, params, { transaction });

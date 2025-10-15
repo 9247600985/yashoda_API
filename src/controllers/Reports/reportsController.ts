@@ -9,15 +9,15 @@ export default class reportsController {
   constructor(private app: Router) {
     app.use("/reports", this.router);
 
-    this.router.get("/AccountReport", authenticateToken, this.AccountReport.bind(this)); 
-    this.router.get("/AmbulanceDetails", authenticateToken, this.AmbulanceDetails.bind(this)); 
-    this.router.get("/BillRegisterCollectionSummary", authenticateToken, this.BillRegisterCollectionSummary.bind(this)); 
-    this.router.get("/DeptWiseCollectionSummary", authenticateToken, this.DeptWiseCollectionSummary.bind(this)); 
-    this.router.get("/DeptWiseReportForAccounts", authenticateToken, this.DeptWiseReportForAccounts.bind(this)); 
-    this.router.get("/InvestigationWiseCollection", authenticateToken, this.InvestigationWiseCollection.bind(this)); 
-    this.router.get("/ConsultationWise", authenticateToken, this.ConsultationWise.bind(this)); 
-    this.router.get("/InvestigationCountWise", authenticateToken, this.InvestigationCountWise.bind(this)); 
-    this.router.get("/getPaymodeWiseDetails", authenticateToken, this.getPaymodeWiseDetails.bind(this)); 
+    this.router.get("/AccountReport", authenticateToken, this.AccountReport.bind(this));
+    this.router.get("/AmbulanceDetails", authenticateToken, this.AmbulanceDetails.bind(this));
+    this.router.get("/BillRegisterCollectionSummary", authenticateToken, this.BillRegisterCollectionSummary.bind(this));
+    this.router.get("/DeptWiseCollectionSummary", authenticateToken, this.DeptWiseCollectionSummary.bind(this));
+    this.router.get("/DeptWiseReportForAccounts", authenticateToken, this.DeptWiseReportForAccounts.bind(this));
+    this.router.get("/InvestigationWiseCollection", authenticateToken, this.InvestigationWiseCollection.bind(this));
+    this.router.get("/ConsultationWise", authenticateToken, this.ConsultationWise.bind(this));
+    this.router.get("/InvestigationCountWise", authenticateToken, this.InvestigationCountWise.bind(this));
+    this.router.get("/getPaymodeWiseDetails", authenticateToken, this.getPaymodeWiseDetails.bind(this));
   }
 
   async AccountReport(req: Request, res: Response): Promise<void> {
@@ -32,7 +32,16 @@ export default class reportsController {
     }
     try {
       const { records } = await executeDbQuery(sql, { FromDate: input.FROMDATE, ToDate: input.TODATE, Bill_number: `%${input.Bill_number || ''}%`, Clinic_Code: `%${input.Clinic_Code || ''}%` });
-      res.json({ status: 0, result: records });
+
+      const cleanRecords = records.map((row: any) => {
+        const cleaned: any = {};
+        for (const key in row) {
+          cleaned[key] = row[key] == null ? "" : row[key];  // handles null and undefined
+        }
+        return cleaned;
+      });
+
+      res.json({ status: 0, result: cleanRecords });
     } catch (err: any) {
       res.status(500).json({ status: 1, result: err.message });
     }
@@ -59,9 +68,9 @@ export default class reportsController {
   }
 
   async BillRegisterCollectionSummary(req: Request, res: Response): Promise<void> {
-    
+
     const input = req.method === 'GET' ? req.query : req.body;
-    let hospid='';
+    let hospid = '';
 
     if (!input.Clinic_Code) {
       hospid = input.hospitalId || "";
@@ -133,7 +142,7 @@ export default class reportsController {
   async DeptWiseReportForAccounts(req: Request, res: Response): Promise<void> {
     const input = req.method === 'GET' ? req.query : req.body;
 
-    let hospid='';
+    let hospid = '';
     if (!input.Clinic_Code) {
       hospid = input.hospitalId || "";
     } else if (input.Clinic_Code === "001001001000") {
@@ -146,7 +155,16 @@ export default class reportsController {
 
     try {
       const { records } = await executeDbQuery(sql, { FROMDATE: input.FROMDATE, TODATE: input.TODATE, UserId: `%${input.UserId}%`, hospid: hospid ? `%${hospid}%` : "%%", DoctCode: `%${input.DoctCode || ''}%`, });
-      res.json({ status: 0, result: records });
+
+      const cleanRecords = records.map((row: any) => {
+        const cleaned: any = {};
+        for (const key in row) {
+          cleaned[key] = row[key] == null ? "" : row[key];  
+        }
+        return cleaned;
+      });
+
+      res.json({ status: 0, result: cleanRecords });
     } catch (err: any) {
       res.status(500).json({ status: 1, result: err.message });
     }
@@ -176,7 +194,7 @@ export default class reportsController {
     }
 
     if (input.ServCode) {
-      Serv_Code_Cond = ` AND S.SERVCODE = @ServCode `;
+      Serv_Code_Cond = ` AND S.SERVNAME = @ServCode `;
     }
 
     const sql = ` SELECT BM.OPREGNO AS REGNO, BM.BILLNO, CONVERT(varchar(10), BM.BILLDATE, 103) AS BILLDATE, BM.PATFNAME AS Patientname, S.SERVCODE, S.SERVNAME AS Investigation, OD.AMOUNT AS TotalAmt, OD.SERDISCOUNT AS DiscAmt, OD.AMOUNT - OD.SERDISCOUNT AS Paid, 0 AS DUEAMT, (OD.PATCNAMT + OD.COMCNAMT) AS REFUND, (OD.AMOUNT - OD.SERDISCOUNT - (OD.PATCNAMT + OD.COMCNAMT)) AS NET, U.USERNAME, TM.CLINIC_NAME FROM  OPD_BILLMST BM LEFT JOIN OPD_BILLTRN OD ON BM.BILLNO = OD.BILLNO LEFT JOIN MST_SERVICES S ON OD.SERVCODE = S.SERVCODE LEFT JOIN DGL_TESTMASTER DM ON DM.TESTCODE = S.SERVCODE LEFT JOIN DGL_LABDEPT D ON D.LABDPTCODE = DM.LABDPTCODE LEFT JOIN MST_USERDETAILS U ON BM.CREATED_BY = U.USERID INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = BM.CLNORGCODE WHERE BM.CLNORGCODE LIKE @hospid AND CONVERT(varchar(10), BM.BILLDATE, 120) >= @FromDate AND CONVERT(varchar(10), BM.BILLDATE, 120) <= @ToDate AND BM.CREATED_BY LIKE @UserID ${Serv_Type_Cond} ${Serv_Code_Cond} AND BM.BILLTYPE = 'OB' ORDER BY 5`;
@@ -204,7 +222,7 @@ export default class reportsController {
       hospid = input.Clinic_Code;
     }
 
-    
+
     if (input.Case_NType == "Y" && input.Case_RType == "Y") {
       Case_Cond = " AND OPC.PATTYPE in('New','Old') ";
     }
@@ -277,7 +295,7 @@ export default class reportsController {
       containsSpecialCharacters(input.UserId) ||
       containsSpecialCharacters(input.Clinic_Code)
     ) {
-      res.json({ status: 1, result: [], message:"Please avoid special characters in fields" }); 
+      res.json({ status: 1, result: [], message: "Please avoid special characters in fields" });
       return;
     }
 

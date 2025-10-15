@@ -273,3 +273,26 @@ export interface PatDetailsFromAppointment {
   deptcd?: string;
   deptname?: string;
 }
+
+export interface PaymentModeRow {
+  Paymodeid: string;
+  PayMode: string;
+}
+
+export interface PaymentFieldRow {
+  FieldId: number;
+  FieldName: string;
+  payModeId: string;
+}
+
+export interface PaymentField {
+  fieldId: number;
+  fieldName: string;
+  payModeId: string;
+}
+
+export interface PaymentMode {
+  paymentModeId: string;
+  paymentModeName: string;
+  paymentFields: PaymentField[];
+}

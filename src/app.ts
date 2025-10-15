@@ -10,6 +10,7 @@ import { logInfo, logError } from "./utilities/logger";
 import { conpool, getPool } from "./db";
 import UserController from "./controllers/userController";
 import investigationController from "./controllers/OP/investigationController";
+import creditNoteController from "./controllers/OP/creditNoteController";
 
 
 const app: Application = express();
@@ -48,7 +49,8 @@ new reportsController(apiRouter);
 new mastersController(apiRouter);
 new numberGenController(apiRouter);
 new consultationController(apiRouter);
-// new investigationController(apiRouter);
+new investigationController(apiRouter);
+new creditNoteController(apiRouter);
 
 app.use("/api", apiRouter);
 
