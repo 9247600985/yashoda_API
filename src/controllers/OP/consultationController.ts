@@ -57,7 +57,7 @@ export default class consultationController {
     this.router.post("/PatientMaster", authenticateToken, this.savePatientMaster.bind(this));
     this.router.post("/Consultation", authenticateToken, this.saveConsultation.bind(this));
     this.router.post("/BillInsert", authenticateToken, this.generateBillInsert.bind(this));
-    this.router.post("/DOCTPATCON", authenticateToken, this.saveDOCTPATCON.bind(this));
+    this.router.post("/saveDOCTPATCON", authenticateToken, this.saveDOCTPATCON.bind(this));
     this.router.post("/getCurrentVisitType", authenticateToken, this.getCurrentVisitType.bind(this));
     this.router.post("/getCurrentVisitType1", authenticateToken, this.getCurrentVisitType1.bind(this));
     this.router.post("/getPatientList", authenticateToken, this.getPatientList.bind(this));
@@ -1820,27 +1820,27 @@ export default class consultationController {
         CLNORGCODE: input.CLNORGCODE,
         DOCTCODE: input.DOCTCODE,
         MEDRECNO: input.MEDRECNO,
-        IPNO: input.IPNO || null,
-        CONSULTATIONTYPE: input.CONSULTATIONTYPE || null,
-        EPISODENO: input.EPISODENO || null,
-        PAIDCONSDATE: input.PAIDCONSDATE || null,
-        PAIDCONSNO: input.PAIDCONSNO || null,
-        PREVISITDATE: input.PREVISITDATE || null,
-        LASTVISITDATE: input.LASTVISITDATE || null,
+        IPNO: input.IPNO ,
+        CONSULTATIONTYPE: input.CONSULTATIONTYPE ,
+        EPISODENO: input.EPISODENO ,
+        PAIDCONSDATE: input.PAIDCONSDATE,
+        PAIDCONSNO: input.PAIDCONSNO ,
+        PREVISITDATE: input.PREVISITDATE ,
+        LASTVISITDATE: input.LASTVISITDATE ,
         VISITS: input.VISITS || 0,
         CREATED_BY: sessionUID,
         CREATED_ON: input.Crated_On,
-        EDITED_BY: input.EDITED_BY || null,
-        EDITED_ON: input.EDITED_ON || null,
+        EDITED_BY: input.EDITED_BY || '',
+        EDITED_ON: input.EDITED_ON || '1900-01-01',
         STATUS: input.STATUS || 'A',
         FreeVisit: input.FreeVisit || 0,
         PaidVisit: input.PaidVisit || 0,
-        VisitType: input.VisitType || null,
-        DPCId: input.DPCId || null,
-        REVISIONID: input.REVISIONID || null,
+        VisitType: input.VisitType ,
+        DPCId: input.DPCId ,
+        REVISIONID: input.REVISIONID  ,
         IPFollowUp_Visits: input.IP_VISITS || 0
       };
-
+      
       const spQuery = `EXEC ${spName} 
       @CLNORGCODE, @DOCTCODE, @MEDRECNO, @IPNO, @CONSULTATIONTYPE, @EPISODENO, 
       @PAIDCONSDATE, @PAIDCONSNO, @PREVISITDATE, @LASTVISITDATE, @VISITS, 
