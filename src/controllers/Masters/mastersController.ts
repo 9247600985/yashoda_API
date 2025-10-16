@@ -2,6 +2,7 @@ import express, { Application, Request, Response, Router } from "express";
 import { executeDbQuery } from "../../db";
 import { IsBase64 } from "../../utilities/base64Utils";
 import sql from "mssql";
+import { authenticateToken } from "../../utilities/authMiddleWare";
 
 
 export default class mastersController {
@@ -10,16 +11,16 @@ export default class mastersController {
   constructor(private app: Router) {
     app.use("/masters", this.router);
 
-    this.router.get("/BindSalutaions", this.BindSalutaions.bind(this));
-    this.router.get("/TwoField", this.TwoField.bind(this));
-    this.router.get("/TwoFieldInnerJoin", this.TwoFieldInnerJoin.bind(this));
-    this.router.get("/LoadDropDowns", this.LoadDropDowns.bind(this));
-    this.router.get("/GenderFromSalutation", this.getGenderFromSalutation.bind(this));
-    this.router.get("/AgeCalculation1", this.getAgeCalculation1.bind(this));
-    this.router.get("/AgeCalculation", this.getAgeCalculation.bind(this));
-    this.router.get("/loadRevision", this.loadRevision.bind(this));
-    this.router.get("/getHospData", this.getHospData.bind(this));
-    this.router.get("/getHospDataByCounter", this.getHospDataByCounter.bind(this));
+    this.router.get("/BindSalutaions", authenticateToken, this.BindSalutaions.bind(this));
+    this.router.get("/TwoField", authenticateToken, this.TwoField.bind(this));
+    this.router.get("/TwoFieldInnerJoin", authenticateToken, this.TwoFieldInnerJoin.bind(this));
+    this.router.get("/LoadDropDowns", authenticateToken, this.LoadDropDowns.bind(this));
+    this.router.get("/GenderFromSalutation", authenticateToken, this.getGenderFromSalutation.bind(this));
+    this.router.get("/AgeCalculation1", authenticateToken, this.getAgeCalculation1.bind(this));
+    this.router.get("/AgeCalculation", authenticateToken, this.getAgeCalculation.bind(this));
+    this.router.get("/loadRevision", authenticateToken, this.loadRevision.bind(this));
+    this.router.get("/getHospData", authenticateToken, this.getHospData.bind(this));
+    this.router.get("/getHospDataByCounter", authenticateToken, this.getHospDataByCounter.bind(this));
 
   }
 

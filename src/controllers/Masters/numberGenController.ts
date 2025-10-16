@@ -1,5 +1,6 @@
 import express, { Application, Request, Response, Router } from "express";
 import { executeDbQuery } from "../../db";
+import { authenticateToken } from "../../utilities/authMiddleWare";
 
 export default class numberGenController {
 
@@ -8,8 +9,8 @@ export default class numberGenController {
     constructor(private app: Router) {
         app.use("/noGen", this.router);
 
-        this.router.get("/TMCurrNumber", this.getTMCurrNumber.bind(this));
-        this.router.get("/CurrNumberWExt", this.GetCurrNumberWExt.bind(this));
+        this.router.get("/TMCurrNumber", authenticateToken, this.getTMCurrNumber.bind(this));
+        this.router.get("/CurrNumberWExt", authenticateToken, this.GetCurrNumberWExt.bind(this));
     }
 
     async getTMCurrNumber(req: Request, res: Response): Promise<void> {
