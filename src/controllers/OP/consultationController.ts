@@ -573,7 +573,7 @@ export default class consultationController {
   async GetPATTYPE(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
 
-    const sql = `SELECT count(*) FROM OPD_DOCTPATCON WHERE MEDRECNO=@MEDRECNO`;
+    const sql = `SELECT count(*) as count FROM OPD_DOCTPATCON WHERE MEDRECNO=@MEDRECNO`;
 
     const params = { MEDRECNO: input.MEDRECNO }
     try {
@@ -1768,7 +1768,7 @@ export default class consultationController {
         NATLCODE: input.Nationality,
         RELGCODE: input.Religion,
         fathername: input.fathername,
-        CREATED_BY: null, CREATED_ON: null, EDITED_BY: input.userId, EDITED_ON: input.Crated_On,
+        CREATED_BY: input.userId, CREATED_ON: input.Crated_On, EDITED_BY: input.userId, EDITED_ON: input.Crated_On,
       };
 
       await executeDbQuery(insertQuery, params, { transaction });
