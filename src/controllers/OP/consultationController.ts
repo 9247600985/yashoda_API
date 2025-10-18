@@ -1065,8 +1065,7 @@ export default class consultationController {
         Country: input.countryid,
         State: input.stateid,
         District: input.districtid,
-        Address: ``,
-        // Address: `${input.address1} ${input.address2} ${input.address3}`,
+        Address: `${input.address1} ${input.address2} ${input.address3}`,
         Patient_Category_Id: input.patcatid,
         EmgConct_Name: null,
         EmgConct_Relation: null,
@@ -1111,7 +1110,7 @@ export default class consultationController {
         ValidDate: input.validdate || null,
         Image_Name: input.imagepath
           ? `/PatientImages/${input.imagepath}`
-          : null,
+          : '',
         AppointmentNO: null,
         EXPDUEDATE: null,
         REVISIONID: null,

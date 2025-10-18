@@ -296,3 +296,9 @@ export interface PaymentMode {
   paymentModeName: string;
   paymentFields: PaymentField[];
 }
+
+export function pureSqlDate(d: string | Date | null): Date | null {
+  if (!d) return null;
+  const s = new Date(d).toISOString().substring(0, 10).split("-");
+  return new Date(Number(s[0]), Number(s[1]) - 1, Number(s[2]));
+}
