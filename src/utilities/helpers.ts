@@ -302,3 +302,18 @@ export function pureSqlDate(d: string | Date | null): Date | null {
   const s = new Date(d).toISOString().substring(0, 10).split("-");
   return new Date(Number(s[0]), Number(s[1]) - 1, Number(s[2]));
 }
+
+export function toInt(val: any, def: number = 0): number {
+  const n = Number(val);
+  return Number.isFinite(n) ? n : def;
+}
+
+export function toDate(val: any): Date | null {
+  if (!val) return null;
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+export function fmtDateYYYYMMDD(d: Date | null): string | undefined {
+  return d ? d.toISOString().split("T")[0] : undefined;
+}

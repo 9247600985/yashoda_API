@@ -2,7 +2,7 @@ import express, { Request, Response, Router } from "express";
 import os from "os";
 import { conpool, executeDbQuery } from "../../db";
 import sql from "mssql";
-import { VisitType, VisitTypeResponse, safeVal, PatSearchCriteria, PatientSearchObj, formatDate, safeNumber, RegistrationFee, numberToWords, CompanyNoticeBoardRegistration, formatDateChange, PatDetailsFromAppointment, formatDateForDb } from "../../utilities/helpers";
+import { VisitType, VisitTypeResponse, safeVal, PatSearchCriteria, PatientSearchObj, formatDate, safeNumber, RegistrationFee, numberToWords, CompanyNoticeBoardRegistration, formatDateChange, PatDetailsFromAppointment, formatDateForDb, toDate, fmtDateYYYYMMDD, toInt } from "../../utilities/helpers";
 import { authenticateToken } from "../../utilities/authMiddleWare";
 const moment = require('moment');
 
@@ -333,44 +333,30 @@ export default class consultationController {
   }
 
   async getCurrentVisitType1(req: Request, res: Response): Promise<void> {
-    const input: VisitType = req.method === "GET" ? (req.query as any) : req.body;
+    const input = req.method === "GET" ? req.query : req.body;
+
+    const viewmodeStr = (input.viewmode ?? "").toString();
+    const isViewModeFalse = viewmodeStr === "False" || viewmodeStr === "false";
+    const isViewModeTrue = viewmodeStr === "True" || viewmodeStr === "true";
 
     let query = "";
-    if (input.viewmode === "false") {
-      query = ` SELECT DP.VisitType, DP.CLNORGCODE, DP.DOCTCODE, DP.MEDRECNO, DP.VisitType AS DPVisitType, DP.VISITS, DP.FreeVisit, DP.PaidVisit, MC.Valid_Days, DP.LASTVISITDATE, MC.FreeFollowUp_No, MC.PaidFollowUp_No, DP.PAIDCONSDATE, DP.EDITED_ON, DP.IPFollowUp_Visits, MC.IP_FollowUp_Visits, MC.IP_FollowUp_Days FROM OPD_DOCTPATCON DP, Mst_ChargeSheet_TM MC WHERE DP.DOCTCODE = MC.Doctor_ID AND MC.TARIFFID=@TARIFFCODE AND MC.CLNORGCODE=@HospitalId AND DP.CLNORGCODE=@CLNORGCODE AND DP.MEDRECNO=@mrno AND DP.DOCTCODE=@doctcode
-    `;
+    if (isViewModeFalse) {
+      query = `select DP.VisitType,DP.CLNORGCODE,DP.DOCTCODE,DP.MEDRECNO,DP.VisitType DPVisitType,DP.VISITS,DP.FreeVisit, DP.PaidVisit ,MC.Valid_Days,DP.LASTVISITDATE,MC.FreeFollowUp_No,MC.PaidFollowUp_No,DP.PAIDCONSDATE,DP.EDITED_ON,dp.IPFollowUp_Visits,MC.IP_FollowUp_Visits,MC.IP_FollowUp_Days from OPD_DOCTPATCON DP ,Mst_ChargeSheet_TM MC  WHERE DP.DOCTCODE = MC.Doctor_ID AND MC.TARIFFID=@TARIFFCODE AND MC.CLNORGCODE =@HospitalId AND DP.CLNORGCODE=@CLNORGCODE AND DP.MEDRECNO=@mrno AND  DP.DOCTCODE=@doctcode`;
     } else {
-      query = ` SELECT CN.VISITTYPE, DP.CLNORGCODE, DP.DOCTCODE, DP.MEDRECNO, DP.VisitType AS DPVisitType, DP.VISITS, DP.FreeVisit, DP.PaidVisit, MC.Valid_Days, DP.LASTVISITDATE, MC.FreeFollowUp_No, MC.PaidFollowUp_No, DP.PAIDCONSDATE, DP.EDITED_ON, DP.IPFollowUp_Visits, MC.IP_FollowUp_Visits, MC.IP_FollowUp_Days FROM OPD_CONSULTATION CN LEFT JOIN OPD_DOCTPATCON DP ON CN.DOCTCODE = DP.DOCTCODE LEFT JOIN Mst_ChargeSheet_TM MC ON DP.DOCTCODE = MC.Doctor_ID WHERE MC.TARIFFID=@TARIFFCODE AND MC.CLNORGCODE=@HospitalId AND DP.CLNORGCODE=@CLNORGCODE AND DP.MEDRECNO=@mrno AND DP.DOCTCODE=@doctcode AND CN.OPDBILLNO=@consultationno `;
+      query = `select CN.VISITTYPE,DP.CLNORGCODE,DP.DOCTCODE,DP.MEDRECNO,DP.VisitType DPVisitType,DP.VISITS,DP.FreeVisit, DP.PaidVisit ,MC.Valid_Days,DP.LASTVISITDATE,MC.FreeFollowUp_No,MC.PaidFollowUp_No,DP.PAIDCONSDATE,DP.EDITED_ON ,dp.IPFollowUp_Visits,MC.IP_FollowUp_Visits,MC.IP_FollowUp_Days from OPD_CONSULTATION CN LEFT  JOIN OPD_DOCTPATCON DP ON CN.DOCTCODE = DP.DOCTCODE LEFT  JOIN Mst_ChargeSheet_TM MC  ON DP.DOCTCODE = MC.Doctor_ID WHERE MC.TARIFFID=@TARIFFCODE AND MC.CLNORGCODE = @HospitalId  AND DP.CLNORGCODE=@CLNORGCODE AND DP.MEDRECNO=@mrno AND  DP.DOCTCODE=@doctcode  AND  CN.OPDBILLNO=@consultationno`;
     }
 
     try {
-      const pool = await conpool.connect();
+      const disQry = ` SELECT TOP 1 DISDATE FROM IPD_DISCHARGE WHERE IPNO IN ( SELECT IPNO FROM IPD_ADMISSION WHERE ADMNDOCTOR = @doctcode AND MEDRECNO = @mrno AND CONVERT(varchar(10), DISCHRGDT, 120) >= DATEADD(D, -1 * @IP_VISITDAYS, GETDATE()) ) `;
 
-      // 🔹 Get Latest Discharge Date
-      const disQry = ` SELECT TOP 1 DISDATE FROM IPD_DISCHARGE WHERE IPNO IN ( SELECT IPNO FROM IPD_ADMISSION WHERE ADMNDOCTOR=@doctcode AND MEDRECNO=@mrno AND CONVERT(varchar(10), DISCHRGDT,120) >= DATEADD(D,-1*@IP_VISITDAYS, GETDATE())) `;
-
-      const disParams = {
-        doctcode: input.doctcode,
-        mrno: input.mrno,
-        IP_VISITDAYS: input.IPFollowUp_Days,
-      };
-
+      const disParams = { doctcode: input.doctcode, mrno: input.mrno, IP_VISITDAYS: toInt(input.IPFollowUp_Days, 0), };
       const disRes = await executeDbQuery(disQry, disParams);
-      const Dis_Date = disRes.records?.[0]?.DISDATE || "";
+      const Dis_Date: string = disRes.records?.[0]?.DISDATE ? String(disRes.records[0].DISDATE) : "";
 
-      // 🔹 Execute main query
-      const mainParams = {
-        TARIFFCODE: input.TariffCode,
-        HospitalId: input.HospitalId,
-        CLNORGCODE: input.HospitalId,
-        mrno: input.mrno,
-        doctcode: input.doctcode,
-        DEPTCODE: input.DEPTCODE,
-        consultationno: input.consultationno,
-      };
-
+      const mainParams = { TARIFFCODE: input.TariffCode, HospitalId: input.HospitalId, CLNORGCODE: input.HospitalId, mrno: input.mrno, doctcode: input.doctcode, DEPTCODE: input.DEPTCODE, consultationno: input.consultationno, };
       const mainRes = await executeDbQuery(query, mainParams);
-      const dt = mainRes.records;
+      const dt = mainRes.records || [];
+
       const visityTypes: VisitTypeResponse[] = [];
 
       if (dt.length === 0) {
@@ -384,75 +370,178 @@ export default class consultationController {
             PaidVisit: "0",
           });
         }
-        res.json({ status: 0, result: visityTypes });
+        res.json({ d: visityTypes });
         return;
       }
 
       for (const dr of dt) {
-        const visits = safeVal(dr.VISITS, 0);
-        const freevisits = safeVal(dr.FreeVisit, 0);
-        const paidvisits = safeVal(dr.PaidVisit, 0);
-        const freefolowup = safeVal(dr.FreeFollowUp_No, 0);
-        const paidfollowup = safeVal(dr.PaidFollowUp_No, 0);
-        const validDays = safeVal(dr.Valid_Days, 0);
-        const PAIDCONSDATE = dr.PAIDCONSDATE ? new Date(dr.PAIDCONSDATE) : null;
-        const RECEIPTDATE = dr.EDITED_ON ? new Date(dr.EDITED_ON) : null;
-        const IP_FOLLOWUP_VISITS = safeVal(dr.IP_FollowUp_Visits, 0);
+        const visits = toInt(dr.VISITS, 0);
+        const freevisits = toInt(dr.FreeVisit, 0);
+        const paidvisits = toInt(dr.PaidVisit, 0);
+        const freefolowup = toInt(dr.FreeFollowUp_No, 0);
+        const paidfollowup = toInt(dr.PaidFollowUp_No, 0);
+        const validDays = toInt(dr.Valid_Days, 0);
+        const PAIDCONSDATE = toDate(dr.PAIDCONSDATE);
+        const RECEIPTDATE = toDate(dr.EDITED_ON);
+        const IP_FOLLOWUP_DAYS = toInt(dr.IP_FollowUp_Days, 0);
+        const IP_FOLLOWUP_VISITS = toInt(dr.IP_FollowUp_Visits, 0);
 
         let visittype = "1";
-        let visitype = "0";
+        let CHKPAIDCONSDATE = fmtDateYYYYMMDD(PAIDCONSDATE);
+        let CHKRCPTDATE = fmtDateYYYYMMDD(RECEIPTDATE);
 
-        // 🔹 Apply discharge logic
         if (Dis_Date !== "") {
-          // Count IP followup consultations
-          const ipParams = {
+          const IP_VISITDAYS = toInt(input.IPFollowUp_Days, 0);
+          const CHECKDATE = (PAIDCONSDATE && Number.isFinite(IP_VISITDAYS))
+            ? new Date(PAIDCONSDATE.getTime() + IP_VISITDAYS * 24 * 60 * 60 * 1000)
+            : null;
+
+          const ipCountQry = ` SELECT COUNT(*) AS CNT FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DOCTCODE = @doctcode AND CONVERT(varchar(10), RECEIPTDATE, 120) > DATEADD(D, -1 * @IP_VISITDAYS, GETDATE()) AND VISITTYPE = '4' AND STATUS != 'C' `;
+          const ipCountParams = {
             doctcode: input.doctcode,
             mrno: input.mrno,
-            IP_VISITDAYS: input.IPFollowUp_Days,
+            IP_VISITDAYS: IP_VISITDAYS,
           };
+          const ipRes = await executeDbQuery(ipCountQry, ipCountParams);
+          const IPFOLLOWUP_COUNT = toInt(ipRes.records?.[0]?.CNT, 0);
 
-          const ipRes = await executeDbQuery(`SELECT COUNT(*) AS CNT FROM OPD_CONSULTATION WHERE MEDRECNO=@mrno AND DOCTCODE=@doctcode AND CONVERT(varchar(10),RECEIPTDATE,120) > DATEADD(D,-1*@IP_VISITDAYS,GETDATE()) AND VISITTYPE='4' AND STATUS!='C' `,
-            ipParams
-          );
-
-          const IPFOLLOWUP_COUNT = ipRes.records?.[0]?.CNT || 0;
           if (IPFOLLOWUP_COUNT < IP_FOLLOWUP_VISITS) {
             visityTypes.push({
               visitype: "4",
-              IP_VISITS: dr.IPFollowUp_Visits?.toString(),
+              IP_VISITS: String(dr.IPFollowUp_Visits ?? IP_FOLLOWUP_VISITS),
             });
             continue;
+          } else {
+
+            const IPCHKDATE = CHKPAIDCONSDATE ?? "1900-01-01";
+            if (IPCHKDATE === "1900-01-01") {
+              visityTypes.push({
+                visitype: "1",
+                VISITS: String(visits),
+                FreeVisit: String(freevisits),
+                PaidVisit: String(paidvisits),
+              });
+              continue;
+            } else {
+
+              const nowDate = new Date();
+              const withinValidWindow = CHECKDATE ? (nowDate < CHECKDATE) : false;
+
+
+              const latestConDateQry = ` SELECT TOP 1 RECEIPTDATE FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DEPTCODE = @DEPTCODE AND STATUS != 'c' AND VISITTYPE = '1' ORDER BY RECEIPTDATE DESC `;
+              const latestConParams = { mrno: input.mrno, DEPTCODE: input.DEPTCODE };
+              const latestRes = await executeDbQuery(latestConDateQry, latestConParams);
+              const latestConsDate = toDate(latestRes.records?.[0]?.RECEIPTDATE);
+              const RCPTDATE = fmtDateYYYYMMDD(latestConsDate);
+
+
+              const freeFollowCountQry = ` SELECT COUNT(*) AS CNT FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DEPTCODE = @DEPTCODE AND CONVERT(varchar(10), RECEIPTDATE, 120) >= @RCPTDATE AND VISITTYPE = '2' AND STATUS != 'C' `;
+              const freeFollowParams = { mrno: input.mrno, DEPTCODE: input.DEPTCODE, RCPTDATE };
+              const freeCountRes = await executeDbQuery(freeFollowCountQry, freeFollowParams);
+              const Freefollowupcount = toInt(freeCountRes.records?.[0]?.CNT, 0);
+
+              // Count Paid Follow-ups (VISITTYPE='3') since RCPTDATE by DEPTCODE
+              const paidFollowCountQry = ` SELECT COUNT(*) AS CNT FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DEPTCODE = @DEPTCODE AND CONVERT(varchar(10), RECEIPTDATE, 120) >= @RCPTDATE AND VISITTYPE = '3' AND STATUS != 'C' `;
+              const paidFollowParams = { mrno: input.mrno, DEPTCODE: input.DEPTCODE, RCPTDATE };
+              const paidCountRes = await executeDbQuery(paidFollowCountQry, paidFollowParams);
+              const paidfollowupcount = toInt(paidCountRes.records?.[0]?.CNT, 0);
+
+              // Decision logic mirrors C#
+              if (Freefollowupcount < freefolowup) {
+                if (withinValidWindow) {
+                  visittype = "2";
+                } else if (paidfollowupcount < paidfollowup) {
+                  if (withinValidWindow) visittype = "3";
+                  else visittype = "1";
+                } else {
+                  visittype = "1";
+                }
+              } else if (paidfollowupcount < paidfollowup) {
+                visittype = withinValidWindow ? "3" : "1";
+              } else {
+                visittype = "1";
+              }
+
+
+              if (isViewModeTrue) {
+                visittype = dr.VISITTYPE ? String(dr.VISITTYPE) : "1";
+              }
+
+              visityTypes.push({
+                visitype: visittype,
+                VISITS: String(visits),
+                FreeVisit: String(freevisits),
+                PaidVisit: String(paidvisits),
+                PAIDCONSDATE: CHKPAIDCONSDATE,
+              });
+            }
           }
-        }
-
-        // 🔹 Follow-up logic
-        if (freevisits < freefolowup) {
-          visittype = "2";
-        } else if (paidvisits < paidfollowup) {
-          visittype = "3";
         } else {
-          visittype = "1";
-        }
 
-        // 🔹 Override in viewmode
-        if (input.viewmode === "true") {
-          visittype = dr.VISITTYPE ? dr.VISITTYPE.toString() : "1";
-        }
+          const CHECKDATE = (PAIDCONSDATE && Number.isFinite(validDays))
+            ? new Date(PAIDCONSDATE.getTime() + validDays * 24 * 60 * 60 * 1000)
+            : null;
+          CHKPAIDCONSDATE = fmtDateYYYYMMDD(PAIDCONSDATE);
+          CHKRCPTDATE = fmtDateYYYYMMDD(RECEIPTDATE);
 
-        visityTypes.push({
-          visitype,
-          VISITS: visits.toString(),
-          FreeVisit: freevisits.toString(),
-          PaidVisit: paidvisits.toString(),
-          PAIDCONSDATE: PAIDCONSDATE
-            ? PAIDCONSDATE.toISOString().split("T")[0]
-            : undefined,
-        });
+
+          const latestConDateQry = ` SELECT TOP 1 RECEIPTDATE FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DEPTCODE = @DEPTCODE AND STATUS != 'c' AND VISITTYPE = '1' ORDER BY RECEIPTDATE DESC `;
+
+          const latestConParams = { mrno: input.mrno, DEPTCODE: input.DEPTCODE };
+          const latestRes = await executeDbQuery(latestConDateQry, latestConParams);
+          const latestConsDate = toDate(latestRes.records?.[0]?.RECEIPTDATE);
+          const RCPTDATE = fmtDateYYYYMMDD(latestConsDate);
+
+
+          const freeFollowCountQry = ` SELECT COUNT(*) AS CNT FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DOCTCODE = @doctcode AND CONVERT(varchar(10), RECEIPTDATE, 120) >= @RCPTDATE AND VISITTYPE = '2' AND STATUS != 'C' `;
+          const freeFollowParams = { mrno: input.mrno, doctcode: input.doctcode, RCPTDATE };
+          const freeCountRes = await executeDbQuery(freeFollowCountQry, freeFollowParams);
+          const Freefollowupcount = toInt(freeCountRes.records?.[0]?.CNT, 0);
+
+
+          const paidFollowCountQry = ` SELECT COUNT(*) AS CNT FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DOCTCODE = @doctcode AND CONVERT(varchar(10), RECEIPTDATE, 120) >= @RCPTDATE AND VISITTYPE = '3' AND STATUS != 'C' `;
+          const paidFollowParams = { mrno: input.mrno, doctcode: input.doctcode, RCPTDATE };
+          const paidCountRes = await executeDbQuery(paidFollowCountQry, paidFollowParams);
+          const paidfollowupcount = toInt(paidCountRes.records?.[0]?.CNT, 0);
+
+          const nowDate = new Date();
+          const withinValidWindow = CHECKDATE ? (nowDate < CHECKDATE) : false;
+
+          // Decision logic mirrors C#
+          if (Freefollowupcount < freefolowup) {
+            if (withinValidWindow) {
+              visittype = "2";
+            } else if (paidfollowupcount < paidfollowup) {
+              if (withinValidWindow) visittype = "3";
+              else visittype = "1";
+            } else {
+              visittype = "1";
+            }
+          } else if (paidfollowupcount < paidfollowup) {
+            visittype = withinValidWindow ? "3" : "1";
+          } else {
+            visittype = "1";
+          }
+
+
+          if (isViewModeTrue) {
+            visittype = dr.VISITTYPE ? String(dr.VISITTYPE) : "1";
+          }
+
+          visityTypes.push({
+            visitype: visittype,
+            VISITS: String(visits),
+            FreeVisit: String(freevisits),
+            PaidVisit: String(paidvisits),
+            PAIDCONSDATE: CHKPAIDCONSDATE,
+          });
+        }
       }
 
-      res.json({ status: 0, result: visityTypes });
-    } catch (err: any) {
-      res.status(500).json({ status: 1, message: err.message });
+
+      res.json({ d: visityTypes });
+    } catch (ex: any) {
+      res.status(500).json({ d: [], error: ex.message });
     }
   }
 
