@@ -1,6 +1,6 @@
 import express, { Application, Request, Response, Router } from "express";
 import { executeDbQuery } from "../db";
-import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../utilities/jwtHelper";
+import { generateAccessToken, generateRefreshToken, verifyAccessToken, verifyRefreshToken } from "../utilities/jwtHelper";
 
 export default class UserController {
   private router: Router = express.Router();
@@ -20,9 +20,9 @@ export default class UserController {
     const query = `SELECT U.USERID, U.USERNAME, R.Role FROM MST_USERDETAILS U LEFT JOIN MST_ROLES R ON U.ROLES = R.CODE WHERE U.USERID = @userId AND U.PASSWORD = @Password AND U.STATUS = 'A'`;
     const params = { userId: input.userId, Password: encryptedPassword };
 
-    const query1=`select  UM.USERID, UM.USERNAME, UM.ROLES, UM.MOBILE, UL.CLINICID as CLNORGCODE, TM.CLINIC_NAME as HOSPITALNAME from MST_CLINICTOUSERLINK  UL  inner join Mst_UserDetails UM ON UM.USERID = UL.USERID INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = UL.CLINICID where UL.userid = @userId ORDER BY UL.CLINICID `;
+    const query1 = `select  UM.USERID, UM.USERNAME, UM.ROLES, UM.MOBILE, UL.CLINICID as CLNORGCODE, TM.CLINIC_NAME as HOSPITALNAME from MST_CLINICTOUSERLINK  UL  inner join Mst_UserDetails UM ON UM.USERID = UL.USERID INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = UL.CLINICID where UL.userid = @userId ORDER BY UL.CLINICID `;
 
-    const params1={userId: input.userId};
+    const params1 = { userId: input.userId };
 
     try {
       const result = await executeDbQuery(query, params);
@@ -33,9 +33,9 @@ export default class UserController {
         const payload = { userId: user.USERID, role: user.Role };
         const accessToken = generateAccessToken(payload);
         const refreshToken = generateRefreshToken(payload);
-         
-        res.json({ status: 0, result: "Logged in successfully", accessToken, refreshToken, SessionValues:sessions });
-        
+
+        res.json({ status: 0, result: "Logged in successfully", accessToken, refreshToken, SessionValues: sessions });
+
       } else {
         res.json({ status: 1, result: "Login failed" });
       }
@@ -46,29 +46,32 @@ export default class UserController {
   }
 
   async refreshToken(req: Request, res: Response): Promise<void> {
-    const { refreshToken } = req.body;
+    const { accessToken } = req.body;
 
-    if (!refreshToken) {
-      res.status(401).json({ status: 1, result: "No refresh token provided" });
+    if (!accessToken) {
+      res.status(401).json({ status: 1, result: "No access token provided" });
       return;
     }
 
     try {
-      const decoded = verifyRefreshToken(refreshToken);
+      // Verify the access token instead of refresh token
+      const decoded = verifyAccessToken(accessToken);
 
       const payload = { userId: decoded.userId, role: decoded.role };
 
+      // Issue new tokens
       const newAccessToken = generateAccessToken(payload);
-      const newRefreshToken = generateRefreshToken(payload); 
+      const newRefreshToken = generateRefreshToken(payload);
 
       res.json({
         status: 0,
         result: "Token refreshed successfully",
         accessToken: newAccessToken,
-        refreshToken: newRefreshToken, 
+        refreshToken: newRefreshToken,
       });
     } catch (err: any) {
-      res.status(403).json({ status: 1, result: "Invalid or expired refresh token" });
+      res.status(403).json({ status: 1, result: "Invalid or expired access token" });
     }
   }
+
 }
