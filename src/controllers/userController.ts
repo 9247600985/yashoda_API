@@ -46,20 +46,18 @@ export default class UserController {
   }
 
   async refreshToken(req: Request, res: Response): Promise<void> {
-    const { accessToken } = req.body;
+    const { refreshToken } = req.body;
 
-    if (!accessToken) {
-      res.status(401).json({ status: 1, result: "No access token provided" });
+    if (!refreshToken) {
+      res.status(401).json({ status: 1, result: "No refresh token provided" });
       return;
     }
 
     try {
-      // Verify the access token instead of refresh token
-      const decoded = verifyAccessToken(accessToken);
+      const decoded = verifyRefreshToken(refreshToken);
 
       const payload = { userId: decoded.userId, role: decoded.role };
 
-      // Issue new tokens
       const newAccessToken = generateAccessToken(payload);
       const newRefreshToken = generateRefreshToken(payload);
 
@@ -70,7 +68,7 @@ export default class UserController {
         refreshToken: newRefreshToken,
       });
     } catch (err: any) {
-      res.status(403).json({ status: 1, result: "Invalid or expired access token" });
+      res.status(403).json({ status: 1, result: "Invalid or expired refresh token" });
     }
   }
 
