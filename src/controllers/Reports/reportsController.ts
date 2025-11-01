@@ -2,6 +2,7 @@ import express, { Request, Response, Router } from "express";
 import { executeDbQuery } from "../../db";
 import { containsSpecialCharacters } from "../../utilities/helpers";
 import { authenticateToken } from "../../utilities/authMiddleWare";
+const moment = require('moment');
 
 export default class reportsController {
   private router: Router = express.Router();
@@ -18,6 +19,9 @@ export default class reportsController {
     this.router.get("/ConsultationWise", authenticateToken, this.ConsultationWise.bind(this));
     this.router.get("/InvestigationCountWise", authenticateToken, this.InvestigationCountWise.bind(this));
     this.router.get("/getPaymodeWiseDetails", authenticateToken, this.getPaymodeWiseDetails.bind(this));
+    this.router.get("/OPCollectionReportD", authenticateToken, this.SHOW_DETAILS_REPORT.bind(this));
+    this.router.get("/OPCollectionReportP", authenticateToken, this.SOW_PAYMODE_SUMMARY.bind(this));
+    this.router.get("/UserWiseCollectionReport", authenticateToken, this.GET_DETAILS.bind(this));
   }
 
   async AccountReport(req: Request, res: Response): Promise<void> {
@@ -358,6 +362,149 @@ export default class reportsController {
       res.status(500).json({ status: 1, result: err.message });
     }
   }
+
+  async SHOW_DETAILS_REPORT(req: Request, res: Response): Promise<void> {
+    const input: any = req.method === "GET" ? req.query : req.body;
+
+    try {
+
+      let hospCheck = "";
+      const hospId = input.hospitalId || "";
+      if (hospId === "001001001000") {
+        hospCheck = "";
+      } else {
+        hospCheck = hospId;
+      }
+
+      let OPBILL = "";
+      let RECEIPTS = "";
+      if (!input.USERID) {
+        OPBILL = ` AND M.CREATED_BY LIKE @UserId AND M.CLNORGCODE LIKE @HospCheck `;
+        RECEIPTS = ` AND R.CREATED_BY LIKE @UserId AND R.CLNORGCODE LIKE @HospCheck `;
+      } else {
+        OPBILL = ` AND M.CREATED_BY = @UserIdExact AND M.CLNORGCODE LIKE @HospCheck `;
+        RECEIPTS = ` AND R.CREATED_BY = @UserIdExact AND R.CLNORGCODE LIKE @HospCheck `;
+      }
+
+      const sql = `select 'OP CONSULTATION' TRANTYPE,M.MEDRECNO,M.PATNAME,M.BILLNO,M.BILLDATE,M.AMOUNTPAID,(M.NETAMOUNT-M.AMOUNTPAID-M.CNAMOUNT+M.RFNDAMOUNT) DUE,P.PayMode,C.Name COMPANY,M.CREATED_BY USERID,M.REMARKS, M.STATUS,U.USERNAME,TM.CLINIC_NAME from OPD_BILLMST M LEFT JOIN PayMode P ON P.Paymodeid=M.PAYMODE LEFT JOIN Company C ON C.Com_Id=M.CRDCOMPCD INNER JOIN MST_USERDETAILS U ON U.USERID = M.CREATED_BY INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = M.CLNORGCODE where convert(varchar(10),M.BILLDATE,120) between @FromDate and @ToDate and M.BILLTYPE='OC' ${OPBILL}  UNION ALL select 'OP BILL' TRANTYPE,M.MEDRECNO,M.PATNAME,M.BILLNO,M.BILLDATE,M.AMOUNTPAID,(M.NETAMOUNT - M.AMOUNTPAID - M.CNAMOUNT + M.RFNDAMOUNT) DUE,P.PayMode,C.Name COMPANY, M.CREATED_BY USERID, M.REMARKS, M.STATUS,U.USERNAME,TM.CLINIC_NAME from OPD_BILLMST M LEFT JOIN PayMode P ON P.Paymodeid = M.PAYMODE LEFT JOIN Company C ON C.Com_Id = M.CRDCOMPCD INNER JOIN MST_USERDETAILS U ON U.USERID = M.CREATED_BY INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = M.CLNORGCODE where convert(varchar(10),M.BILLDATE,120) between @FromDate and @ToDate and M.BILLTYPE='OB' ${OPBILL}  UNION ALL SELECT 'OP REFUND',R.MEDRECNO,M.PATNAME,M.BILLNO,M.BILLDATE,-1*R.AMOUNT AMOUNTPAID,0 DUE,P.PayMode,C.Name COMPANY,R.CREATED_BY USERID,R.REMARKS,R.STATUS,U.USERNAME,TM.CLINIC_NAME FROM OPD_RECEIPTS R INNER JOIN OPD_BILLMST M ON M.BILLNO=R.OPDBILLNO LEFT JOIN PayMode P ON P.Paymodeid=R.PAYMODE LEFT JOIN Company C ON C.Com_Id=M.CRDCOMPCD INNER JOIN MST_USERDETAILS U ON U.USERID = R.CREATED_BY INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = R.CLNORGCODE where convert(varchar(10),R.RECEIPTDATE,120) between @FromDate and @ToDate  ${RECEIPTS}  AND R.RCPTTYPE='OF'  UNION ALL SELECT 'OP DUE COLLECTION',R.MEDRECNO,M.PATNAME,M.BILLNO,M.BILLDATE,R.AMOUNT AMOUNTPAID,0 DUE,P.PayMode,C.Name COMPANY,R.CREATED_BY USERID,R.REMARKS,R.STATUS,U.USERNAME,TM.CLINIC_NAME FROM OPD_RECEIPTS R INNER JOIN OPD_BILLMST M ON M.BILLNO=R.OPDBILLNO LEFT JOIN PayMode P ON P.Paymodeid=R.PAYMODE LEFT JOIN Company C ON C.Com_Id=M.CRDCOMPCD INNER JOIN MST_USERDETAILS U ON U.USERID = R.CREATED_BY INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = R.CLNORGCODE where convert(varchar(10),R.RECEIPTDATE,120) between @FromDate and @ToDate ${RECEIPTS} AND R.RCPTTYPE='OR'`;
+
+      const params: any = { FromDate: input.FROMDATE, ToDate: input.TODATE, UserId: `%${input.USERID || ""}%`, UserIdExact: input.USERID || "", HospCheck: hospCheck ? `%${hospCheck}%` : "%%", };
+
+      const { records } = await executeDbQuery(sql, params);
+
+      const cleanRecords = records.map((row: any) => ({
+        TRANTYPE: row.TRANTYPE || "",
+        MEDRECNO: row.MEDRECNO || "",
+        PATNAME: row.PATNAME || "",
+        TRANNO: row.BILLNO || "",
+        TRANDATE: row.BILLDATE ? moment(row.BILLDATE).format("DD/MM/YYYY HH:mm:ss") : "",
+        PAIDAMOUNT: row.AMOUNTPAID || "",
+        DUEAMOUNT: row.DUE || "0.00",
+        PAYMODE: row.PayMode || "",
+        COMPANY: row.COMPANY || "",
+        USERID: row.USERID || "",
+        REMARKS: row.REMARKS || "",
+        STATUS: row.STATUS || "",
+        USERNAME: row.USERNAME || "",
+        CLINIC_NAME: row.CLINIC_NAME || "",
+      }));
+
+      res.json({ status: 0, d: cleanRecords });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async SOW_PAYMODE_SUMMARY(req: Request, res: Response): Promise<void> {
+    const input: any = req.method === "GET" ? req.query : req.body;
+
+    try {
+
+      let hospCheck = "";
+      const hospId = input.hospitalId || "";
+      if (hospId === "001001001000") {
+        hospCheck = "";
+      } else {
+        hospCheck = hospId;
+      }
+
+      let OPBILL = "";
+      let RECEIPTS = "";
+      if (!input.USERID) {
+        OPBILL = ` AND M.CREATED_BY LIKE @UserId AND M.CLNORGCODE LIKE @HospCheck `;
+        RECEIPTS = ` AND R.CREATED_BY LIKE @UserId AND R.CLNORGCODE LIKE @HospCheck `;
+      } else {
+        OPBILL = ` AND M.CREATED_BY = @UserIdExact AND M.CLNORGCODE LIKE @HospCheck `;
+        RECEIPTS = ` AND R.CREATED_BY = @UserIdExact AND R.CLNORGCODE LIKE @HospCheck `;
+      }
+
+      const sql = `SELECT A.PAYMODE,SUM(A.RECEIPTS) RECEIPTS,SUM(A.REFUNDS) REFUNDS,SUM(A.RECEIPTS)-SUM(A.REFUNDS) NET  FROM (select P.PayMode,SUM(M.AMOUNTPAID) RECEIPTS,0 REFUNDS from OPD_BILLMST M LEFT JOIN PayMode P ON P.Paymodeid=M.PAYMODE LEFT JOIN Company C ON C.Com_Id=M.CRDCOMPCD where convert(varchar(10),M.BILLDATE,120) between @FromDate and @ToDate and M.STATUS!='C'  ${OPBILL} GROUP BY P.PayMode UNION ALL SELECT P.PayMode,0 RECEIPTS,SUM(R.AMOUNT) REFUNDS FROM OPD_RECEIPTS R INNER JOIN OPD_BILLMST M ON M.BILLNO=R.OPDBILLNO LEFT JOIN PayMode P ON P.Paymodeid=R.PAYMODE LEFT JOIN Company C ON C.Com_Id=M.CRDCOMPCD where convert(varchar(10),R.RECEIPTDATE,120) between @FromDate and @ToDate AND R.STATUS!='C' ${RECEIPTS} AND R.RCPTTYPE='OF' GROUP BY P.PayMode UNION ALL SELECT P.PayMode ,SUM(R.AMOUNT) RECEIPTS,0 REFUNDS FROM OPD_RECEIPTS R INNER JOIN OPD_BILLMST M ON M.BILLNO=R.OPDBILLNO LEFT JOIN PayMode P ON P.Paymodeid=R.PAYMODE LEFT JOIN Company C ON C.Com_Id=M.CRDCOMPCD where convert(varchar(10),R.RECEIPTDATE,120) between @FromDate and @ToDate AND R.STATUS!='C' ${RECEIPTS}  AND R.RCPTTYPE='OR' GROUP BY P.PayMode ) A  GROUP BY A.PayMode`;
+
+      const params: any = { FromDate: input.FROMDATE, ToDate: input.TODATE, UserId: `%${input.USERID || ""}%`, UserIdExact: input.USERID || "", HospCheck: hospCheck ? `%${hospCheck}%` : "%%", };
+
+      const { records } = await executeDbQuery(sql, params);
+
+      const cleanRecords = records.map((row: any) => ({
+        PAYMODE: row.PAYMODE || "",
+        RECEIPTS: row.RECEIPTS || "0.00",
+        RETAMOUNT: row.REFUNDS || "0.00",
+        NETAMOUNT: row.NET || "0.00",
+      }));
+
+      res.json({ status: 0, d: cleanRecords });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async GET_DETAILS(req: Request, res: Response): Promise<void> {
+    const input: any = req.method === "GET" ? req.query : req.body;
+
+    try {
+      const containsSpecialCharacters = (str: string) => {
+        const regex = /[^a-zA-Z0-9]/;
+        return regex.test(str);
+      };
+
+      if (input.Clinic && containsSpecialCharacters(input.Clinic)) {
+        res.status(401).json({ status: 1, result: "Unauthorized" });
+        return;
+      }
+
+      const sql = "USP_GETUSERWISECOLLECTION_YASHODA";
+
+      const params: any = { FDATE: input.FromDate, TDATE: input.ToDate, };
+
+      if (input.Clinic) {
+        params.CLNORGCODE = input.Clinic;
+      }
+
+      const { records } = await executeDbQuery(sql, params, { isStoredProc: true });
+
+      const cleanRecords = records.map((row: any) => ({
+        CLNORGCODE: row.CLNORGCODE || "",
+        CLINIC_NAME: row.CLINIC_NAME || "",
+        USERNAME: row.USERNAME || "",
+        CREATED_BY: row.CREATED_BY || "",
+        TotalNO: row.TotalNO || "0.00",
+        CONSULTATION: row.CONSULTATION || "0.00",
+        PROCEDUR: row.PROCEDUR || "0.00",
+        REGGEE: row.REGGEE || "0.00",
+        AUDIOMETRY_CONSULTATION: row["AUDIOMETRY CONSULTATION"] || "0.00",
+        DIETICIAN_CONSULTATION: row["DIETICIAN CONSULTATION"] || "0.00",
+        CASH: row.CASH || "0.00",
+        CARD: row.CARD || "0.00",
+        UPI: row.UPI || "0.00",
+        TOTAL: row.TOTAL || "0.00",
+      }));
+
+      res.json({ status: 0, d: cleanRecords });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+
 
 
 }

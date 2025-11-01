@@ -11,6 +11,8 @@ import { conpool, getPool } from "./db";
 import UserController from "./controllers/userController";
 import investigationController from "./controllers/OP/investigationController";
 import creditNoteController from "./controllers/OP/creditNoteController";
+import dueCollectionController from "./controllers/OP/dueCollectionController";
+import sampleCollectionController from "./controllers/Laboratory/sampleCollection";
 
 
 const app: Application = express();
@@ -51,6 +53,8 @@ new numberGenController(apiRouter);
 new consultationController(apiRouter);
 new investigationController(apiRouter);
 new creditNoteController(apiRouter);
+new dueCollectionController(apiRouter);
+new sampleCollectionController(apiRouter);
 
 app.use("/api", apiRouter);
 
