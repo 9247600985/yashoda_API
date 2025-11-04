@@ -252,8 +252,7 @@ export default class dueCollectionController {
             compCode: input.CompId,
         };
 
-        const pool = await conpool.connect();
-        const transaction = new sql.Transaction(pool);
+        const transaction = new sql.Transaction(conpool);
 
         try {
             await transaction.begin();

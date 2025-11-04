@@ -603,8 +603,7 @@ export default class investigationController {
 
     async saveInvestigation(req: Request, res: Response): Promise<void> {
         const input = req.body.invData;
-        const pool = await conpool.connect();
-        const transaction = new sql.Transaction(pool);
+        const transaction = new sql.Transaction(conpool);
         let Insert_OPD_BILLMST = '', Insert_OPD_Receipts = '', Insert_OPD_BILLTRN = '', Insert_YH_AMBULANCE_DETAILS = '', Insert_DGS_ORDERMST = '', INSERT_DGS_ORDERTRN = '', Insert_DGL_ORDERMST = '', Insert_DGL_ORDERTRN = '', Insert_DGC_ORDERMST = '', Insert_DGC_ORDERTRN = '', insert_DGR_ORDERMST = '', INSERT_DGR_ORDERTRN = '', Update_Patient_Master = '';
         const FinYear: any = await fetchCurrentFinYear();
 
@@ -755,8 +754,7 @@ export default class investigationController {
 
     async saveIPADDRESS_OPDBILLMST(req: Request, res: Response): Promise<void> {
         const input = req.body;
-        const pool = await conpool.connect();
-        const transaction = new sql.Transaction(pool);
+        const transaction = new sql.Transaction(conpool);
 
         try {
             await transaction.begin();
@@ -1032,7 +1030,7 @@ export default class investigationController {
             const { records } = await executeDbQuery(sql, params);
 
             const details = records.map((r: any) => ({
-                BILLSOURCE: r.BILLSOURCE || "",
+                BILLSOURCE: r.billsource || "",
                 PAYMODE: r.PAYMODE || "",
                 TOTSERVAMT: parseFloat(r.TOTSERVAMT).toFixed(2) || "0.00",
                 NETAMOUNT: parseFloat(r.NETAMOUNT).toFixed(2) || "0.00",

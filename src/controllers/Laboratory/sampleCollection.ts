@@ -425,8 +425,7 @@ export default class sampleCollectionController {
 
     async changeStatus(req: Request, res: Response): Promise<void> {
         const input = req.body;
-        const pool = await conpool.connect();
-        const transaction = new sql.Transaction(pool);
+        const transaction = new sql.Transaction(conpool);
 
         try {
             await transaction.begin();
@@ -456,8 +455,7 @@ export default class sampleCollectionController {
         let orderNo = "";
         let collectedBy = "";
 
-        const pool = await conpool.connect();
-        const transaction = new sql.Transaction(pool);
+        const transaction = new sql.Transaction(conpool);
 
         try {
             await transaction.begin();

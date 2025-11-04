@@ -1,3 +1,9 @@
+import sql from 'mssql';
+import path from 'path';
+import fs from 'fs/promises';
+import { executeDbQuery } from '../db';
+
+
 export interface VisitType {
   viewmode: string;
   doctcode: string;
@@ -113,20 +119,20 @@ export const formatDate = (d?: Date | string): string => {
   if (!d) return "";
 
   const dateObj = d instanceof Date ? d : new Date(d);
-  if (isNaN(dateObj.getTime())) return ""; 
+  if (isNaN(dateObj.getTime())) return "";
 
   const year = dateObj.getFullYear();
   const month = String(dateObj.getMonth() + 1).padStart(2, "0");
   const day = String(dateObj.getDate()).padStart(2, "0");
 
-  return `${year}-${month}-${day}`; 
+  return `${year}-${month}-${day}`;
 }
 
 export interface RegfeeInput {
   MedrecNo?: string;
   patcat?: string;
   hospid?: string;
-  HospitalId?:string;
+  HospitalId?: string;
 }
 
 // Response model (similar to registrationFee in C#)
@@ -316,4 +322,42 @@ export function toDate(val: any): Date | null {
 
 export function fmtDateYYYYMMDD(d: Date | null): string | undefined {
   return d ? d.toISOString().split("T")[0] : undefined;
+}
+
+export function ensureBase64Data(data: string): Buffer {
+  const idx = data.indexOf('base64,');
+  const base64 = idx !== -1 ? data.substring(idx + 7) : data;
+  return Buffer.from(base64, 'base64');
+}
+
+export async function saveFileToFolder( base64Data: string, filename: string, resultNo: string, subdir = 'Documents' ): Promise<string> {
+  const uploadsRoot = process.env.UPLOAD_ROOT || path.join(process.cwd(), 'uploads', 'lab');
+  const safeName = filename.replace(/[/\\?%*:|"<>]/g, '_');
+  const dir = path.join(uploadsRoot, resultNo, subdir);
+  await fs.mkdir(dir, { recursive: true });
+  const filePath = path.join(dir, safeName);
+  const buffer = ensureBase64Data(base64Data);
+  await fs.writeFile(filePath, buffer);
+  const rel = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
+  return `/${rel}`;
+}
+
+export async function getResEntryCurrNumber( transaction: sql.Transaction, finYear: string, clnorgcode: string, docType = "LABRESULT" ): Promise<string> {
+  const FinYear = (finYear ?? "").toString().trim();
+  const CLNORGCODE = (clnorgcode ?? "").toString().trim();
+  const DocType = (docType ?? "").toString().trim();
+
+  const sqlText = ` DECLARE @RES VARCHAR(50); EXEC USP_GENERATE_DOCNO @CLNGCODE = @CLNORGCODE, @DOCREFNO = @DOCREFNO, @MODULEID = @MODULEID, @RESULT = @RES OUTPUT; SELECT @RES AS RESULTNO; `;
+
+  const params = { CLNORGCODE: CLNORGCODE, DOCREFNO: DocType, MODULEID: "005", };
+
+  const out = await executeDbQuery(sqlText, params, { transaction, query: sqlText });
+
+  const resultNo = out.records?.[0]?.RESULTNO ? String(out.records[0].RESULTNO).trim() : "";
+
+  if (!resultNo) {
+    throw new Error("Unable to generate RESULTNO (USP_GENERATE_DOCNO returned empty).");
+  }
+
+  return resultNo;
 }

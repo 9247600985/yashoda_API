@@ -376,8 +376,7 @@ export default class creditNoteController {
 
     async saveCreditNote(req: Request, res: Response): Promise<void> {
         const input = req.body;
-        const pool = await conpool.connect();
-        const transaction = new sql.Transaction(pool);
+        const transaction = new sql.Transaction(conpool);
 
         try {
             await transaction.begin();
@@ -519,8 +518,7 @@ export default class creditNoteController {
 
     async saveIPAddress_OPDBILLMST(req: Request, res: Response): Promise<void> {
         const input = req.body;
-        const pool = await conpool.connect();
-        const transaction = new sql.Transaction(pool);
+        const transaction = new sql.Transaction(conpool);
 
         try {
             await transaction.begin();

@@ -1,6 +1,6 @@
 // db.ts
 import sql from "mssql";
-import { logQuery, logError } from "./utilities/logger";
+import { logQuery, logError, logInfo } from "./utilities/logger";
 
 const isLocal = false;
 
@@ -19,16 +19,27 @@ export const config: sql.config = {
 };
 
 export const conpool = new sql.ConnectionPool(config);
-conpool.connect().catch(err => logError(`Pool connect error: ${err.message || err}`));
 
-let pool: sql.ConnectionPool | null = null;
+export const poolReady = conpool.connect().then(() => logInfo("SQL pool ready")).catch(err => logError(`SQL pool connect error: ${err.message || err}`));
+
+conpool.on("connect", (connection: any) => {
+  try {
+    const sock = (connection as any)?.socket;
+    if (sock?.setKeepAlive) {
+      sock.setKeepAlive(true, 10000);
+    }
+    if (sock?.setNoDelay) {
+      sock.setNoDelay(true);
+    }
+  } catch (e: any) {
+    logError(`Keep‑alive setup failed: ${e.message || e}`);
+  }
+});
 
 export async function getPool(): Promise<sql.ConnectionPool> {
-  if (pool && pool.connected) return pool;
-  pool = await sql.connect(config);
-  return pool;
+  await poolReady;
+  return conpool;
 }
-
 interface DbQueryResult {
   records: any[];
   rowsAffected: number[];
