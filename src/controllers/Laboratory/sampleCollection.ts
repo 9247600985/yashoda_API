@@ -434,7 +434,7 @@ export default class sampleCollectionController {
                 const params = { SampleStatus: 'SC', LabCode: data.LabCode, CollectedBy: data.CollectedBy, ExternalVendor: data.ExternalVendor, OrderNo: data.OrderNo, TestCode: data.TestCode };
 
 
-                await executeDbQuery(`UPDATE DGL_ORDERTRN SET samplestatus = @SampleStatus, LABCODE = @LabCode, COLLECTEDBY = @CollectedBy, EXTDIGCODE = @ExternalVendor  WHERE orderno = @OrderNo AND testcode = @TestCode`, params, { transaction });
+                await executeDbQuery(`UPDATE DGL_ORDERTRN SET samplestatus = @SampleStatus, TESTSTATUS=@SampleStatus, LABCODE = @LabCode, COLLECTEDBY = @CollectedBy, EXTDIGCODE = @ExternalVendor  WHERE orderno = @OrderNo AND testcode = @TestCode`, params, { transaction });
             }
 
             await transaction.commit();
