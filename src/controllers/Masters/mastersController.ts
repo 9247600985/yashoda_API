@@ -135,13 +135,18 @@ export default class mastersController {
 
     if (WhereCondRaw) {
       const cleaned = WhereCondRaw.replace(/&quot;/g, "'").trim();
-      // basic SQL injection protection
-      if (cleaned.toUpperCase().includes("DROP") || cleaned.toUpperCase().includes("DELETE")) {
+      const upper = cleaned.toUpperCase();
+
+      // Disallow any DML/DDL keywords
+      const forbidden = ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE", "MERGE", "UNION"];
+      if (forbidden.some(word => upper.includes(word))) {
         res.status(400).json({ status: 1, result: "Invalid WHERE condition" });
         return;
       }
+
       whereSQL = ` AND ${cleaned}`;
     }
+
 
     const sql = ` SELECT ${IdFiled} AS Code, ${DescField} AS Name FROM ${TableName} WHERE 1=1 AND ( ${IdFiled} LIKE @SearchValue OR UPPER(${DescField}) LIKE UPPER(@SearchValue) ) ${whereSQL} ORDER BY ${DescField} `;
 
@@ -191,8 +196,16 @@ export default class mastersController {
     let WhereCond = IsBase64(rawWhereCond) ? atob(rawWhereCond) : rawWhereCond;
 
     if (WhereCond) {
-      WhereCond = WhereCond.replace(/&quot;/g, "'");
+      const cleaned = WhereCond.replace(/&quot;/g, "'").trim();
+      const upper = cleaned.toUpperCase();
+      // basic SQL injection protection
+      const forbidden = ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE", "MERGE", "UNION"];
+      if (forbidden.some(word => upper.includes(word))) {
+        res.status(400).json({ status: 1, result: "Invalid WHERE condition" });
+        return;
+      }
     }
+
 
     let query = `SELECT ${IdFiled} AS idField, ${DescField} AS descField FROM ${TableName}`;
     if (WhereCond && WhereCond.trim().length > 0) {
@@ -246,8 +259,19 @@ export default class mastersController {
 
     if (WhereCondRaw) {
       const cleaned = WhereCondRaw.replace(/&quot;/g, "'").trim();
+      const upper = cleaned.toUpperCase();
+
+      // Disallow any DML/DDL keywords
+      const forbidden = ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE", "MERGE", "UNION"];
+      if (forbidden.some(word => upper.includes(word))) {
+        res.status(400).json({ status: 1, result: "Invalid WHERE condition" });
+        return;
+      }
+
       whereSQL = ` AND ${cleaned}`;
     }
+
+
 
     const sql = ` SELECT ${IdFiled} AS Code, ${DescField} AS Name FROM ${TableName} ${InnerJoinRaw ? InnerJoinRaw.replace(/&quot;/g, "'") : ""} WHERE 1=1 AND ( ${IdFiled} LIKE @SearchValue OR UPPER(${DescField}) LIKE UPPER(@SearchValue) ) ${whereSQL} ORDER BY ${DescField} `;
 

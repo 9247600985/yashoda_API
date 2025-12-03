@@ -15,6 +15,8 @@ import dueCollectionController from "./controllers/OP/dueCollectionController";
 import sampleCollectionController from "./controllers/Laboratory/sampleCollection";
 import resultEntryController from "./controllers/Laboratory/resultEntry";
 import securityController from "./controllers/Security/accessRights";
+import accessRightsController from "./controllers/Security/accessRights";
+import modulesController from "./controllers/Security/modules";
 
 
 const app: Application = express();
@@ -58,7 +60,8 @@ new creditNoteController(apiRouter);
 new dueCollectionController(apiRouter);
 new sampleCollectionController(apiRouter);
 new resultEntryController(apiRouter);
-new securityController(apiRouter);
+new accessRightsController(apiRouter);
+new modulesController(apiRouter);
 
 app.use("/api", apiRouter);
 

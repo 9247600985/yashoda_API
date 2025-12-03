@@ -5,7 +5,7 @@ import sql, { query } from "mssql";
 import { queryObjects } from "v8";
 const moment = require('moment');
 
-export default class securityController {
+export default class accessRightsController {
     private router: Router = express.Router();
 
     constructor(private app: Router) {
