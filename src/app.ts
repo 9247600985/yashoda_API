@@ -14,7 +14,6 @@ import creditNoteController from "./controllers/OP/creditNoteController";
 import dueCollectionController from "./controllers/OP/dueCollectionController";
 import sampleCollectionController from "./controllers/Laboratory/sampleCollection";
 import resultEntryController from "./controllers/Laboratory/resultEntry";
-import securityController from "./controllers/Security/accessRights";
 import accessRightsController from "./controllers/Security/accessRights";
 import modulesController from "./controllers/Security/modules";
 
