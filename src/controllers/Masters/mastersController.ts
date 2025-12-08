@@ -196,16 +196,15 @@ export default class mastersController {
     let WhereCond = IsBase64(rawWhereCond) ? atob(rawWhereCond) : rawWhereCond;
 
     if (WhereCond) {
-      const cleaned = WhereCond.replace(/&quot;/g, "'").trim();
-      const upper = cleaned.toUpperCase();
-      // basic SQL injection protection
+      WhereCond = WhereCond.replace(/&quot;/g, "'").trim();
+
+      const upper = WhereCond.toUpperCase();
       const forbidden = ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE", "MERGE", "UNION"];
       if (forbidden.some(word => upper.includes(word))) {
         res.status(400).json({ status: 1, result: "Invalid WHERE condition" });
         return;
       }
     }
-
 
     let query = `SELECT ${IdFiled} AS idField, ${DescField} AS descField FROM ${TableName}`;
     if (WhereCond && WhereCond.trim().length > 0) {

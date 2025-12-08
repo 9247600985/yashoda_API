@@ -18,7 +18,7 @@ export default class modulesController {
 
     async getModulesDetails(req: Request, res: Response): Promise<void> {
         try {
-            const sqlQuery = `SELECT MODULE_ID, MODULE_NAME, MODULEMAINPAGE, STATUS ST FROM MST_MODULES`;
+            const sqlQuery = `SELECT MODULE_ID, MODULE_NAME, MODULEMAINPAGE, STATUS ST FROM MST_MODULES ORDER BY 2`;
 
             const { records } = await executeDbQuery(sqlQuery);
 

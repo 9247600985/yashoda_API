@@ -16,6 +16,9 @@ import sampleCollectionController from "./controllers/Laboratory/sampleCollectio
 import resultEntryController from "./controllers/Laboratory/resultEntry";
 import accessRightsController from "./controllers/Security/accessRights";
 import modulesController from "./controllers/Security/modules";
+import rolesController from "./controllers/Security/roles";
+import activitiesController from "./controllers/Security/activities";
+import clinicToUserLinkController from "./controllers/Security/clinicToUserLink";
 
 
 const app: Application = express();
@@ -61,6 +64,9 @@ new sampleCollectionController(apiRouter);
 new resultEntryController(apiRouter);
 new accessRightsController(apiRouter);
 new modulesController(apiRouter);
+new rolesController(apiRouter);
+new activitiesController(apiRouter);
+new clinicToUserLinkController(apiRouter);
 
 app.use("/api", apiRouter);
 
