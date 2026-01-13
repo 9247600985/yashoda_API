@@ -6,7 +6,6 @@ import { VisitType, VisitTypeResponse, safeVal, PatSearchCriteria, PatientSearch
 import { authenticateToken } from "../../utilities/authMiddleWare";
 const moment = require('moment');
 
-
 export default class consultationController {
   private router: Router = express.Router();
 
