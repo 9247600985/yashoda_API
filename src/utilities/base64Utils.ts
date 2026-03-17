@@ -1,6 +1,7 @@
 const atob = (str: string) => Buffer.from(str, "base64").toString("utf-8");
 const btoa = (str: string) => Buffer.from(str, "utf-8").toString("base64");
-
+import fs from "fs";
+import path from "path";
 export function decodeBase64(input: string): string {
   try {
     return atob(input);
@@ -21,3 +22,51 @@ export function IsBase64(str: string): boolean {
     return false;
   }
 }
+
+
+
+export function saveFileToFolder(
+  base64Data: string,
+  fileName: string,
+  id: string,
+  folderType: string
+): string {
+  try {
+    const doctorDocs = process.env.DOCTOR_DOCS || "DoctorDocs";
+
+    // Equivalent to Server.MapPath("~/DoctorDocs/")
+    let dirPath = path.join(process.cwd(), doctorDocs);
+    let filePath = `~\\${doctorDocs}`;
+
+    // ~/DoctorDocs
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath);
+    }
+
+    // ~/DoctorDocs/{id}
+    dirPath = path.join(dirPath, id);
+    filePath += `\\${id}`;
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath);
+    }
+
+    // ~/DoctorDocs/{id}/{folderType}
+    dirPath = path.join(dirPath, folderType);
+    filePath += `\\${folderType}`;
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath);
+    }
+
+    // Save file
+    const imgPath = path.join(dirPath, fileName);
+    const buffer = Buffer.from(base64Data, "base64");
+    fs.writeFileSync(imgPath, buffer);
+
+    // Return same style path as ASP.NET
+    return `${filePath}\\${fileName}`;
+  } catch (err) {
+    console.error("File save error:", err);
+    throw err;
+  }
+}
+

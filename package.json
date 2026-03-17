@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  
   "scripts": {
     "build": "tsc",
     "start": "node dist/app.js",
-    "dev": "npx ts-node src/app.ts"
+    "dev": "npx ts-node src/app.ts",
+   "debug": "node --inspect-brk dist/app.js"
   },
   "keywords": [],
   "author": "",

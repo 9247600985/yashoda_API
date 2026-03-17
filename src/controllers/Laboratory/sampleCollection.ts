@@ -426,19 +426,21 @@ export default class sampleCollectionController {
     async changeStatus(req: Request, res: Response): Promise<void> {
         const input = req.body;
         const transaction = new sql.Transaction(conpool);
-
+ 
         try {
             await transaction.begin();
 
             for (const data of input) {
                 const params = { SampleStatus: 'SC', LabCode: data.LabCode, CollectedBy: data.CollectedBy, ExternalVendor: data.ExternalVendor, OrderNo: data.OrderNo, TestCode: data.TestCode };
+                const statusUpdate=`UPDATE DGL_ORDERTRN SET samplestatus = @SampleStatus, TESTSTATUS=@SampleStatus, LABCODE = @LabCode, COLLECTEDBY = @CollectedBy, EXTDIGCODE = @ExternalVendor  WHERE orderno = @OrderNo AND testcode = @TestCode`;
 
-
-                await executeDbQuery(`UPDATE DGL_ORDERTRN SET samplestatus = @SampleStatus, TESTSTATUS=@SampleStatus, LABCODE = @LabCode, COLLECTEDBY = @CollectedBy, EXTDIGCODE = @ExternalVendor  WHERE orderno = @OrderNo AND testcode = @TestCode`, params, { transaction });
+                await executeDbQuery(statusUpdate, params, { transaction })
+                
             }
 
             await transaction.commit();
-            res.json({ status: 0, message: 'Status updated successfully.' });
+            
+            res.json({ status: 0, message: 'Status updated successfully.'});
         } catch (err: any) {
             await transaction.rollback();
             res.status(500).json({ status: 1, message: err.message });
