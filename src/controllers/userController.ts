@@ -10,62 +10,62 @@ export default class UserController {
 
     this.router.post("/login", this.login.bind(this));
     this.router.post("/refreshToken", this.refreshToken.bind(this));
-    this.router.get("/GetUserClinicData", this.GetUserClinicData.bind(this));
+    // this.router.get("/GetUserClinicData", this.GetUserClinicData.bind(this));
 
 
   }
-async GetUserClinicData(req: Request, res: Response): Promise<void> {
+// async GetUserClinicData(req: Request, res: Response): Promise<void> {
 
-  const input = req.method === "GET" ? req.query : req.body;
+//   const input = req.method === "GET" ? req.query : req.body;
 
-  const clinicSql = `
-  SELECT 
-      UL.CLINICID,
-      TM.CLINIC_NAME
-  FROM MST_CLINICTOUSERLINK UL
-  INNER JOIN Mst_UserDetails UM ON UM.USERID = UL.USERID
-  INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = UL.CLINICID
-  WHERE UL.USERID = @UserId
-  ORDER BY UL.CLINICID
-  `;
+//   const clinicSql = `
+//   SELECT 
+//       UL.CLINICID,
+//       TM.CLINIC_NAME
+//   FROM MST_CLINICTOUSERLINK UL
+//   INNER JOIN Mst_UserDetails UM ON UM.USERID = UL.USERID
+//   INNER JOIN TM_CLINICS TM ON TM.CLINIC_CODE = UL.CLINICID
+//   WHERE UL.USERID = @UserId
+//   ORDER BY UL.CLINICID
+//   `;
 
-  const userSql = `
-  SELECT 
-      CLNORGCODE
-  FROM MST_USERDETAILS
-  WHERE USERID = @UserId
-  `;
+//   const userSql = `
+//   SELECT 
+//       CLNORGCODE
+//   FROM MST_USERDETAILS
+//   WHERE USERID = @UserId
+//   `;
 
-  try {
+//   try {
 
-    const clinicResult = await executeDbQuery(clinicSql, {
-      UserId: input.UserId
-    });
+//     const clinicResult = await executeDbQuery(clinicSql, {
+//       UserId: input.UserId
+//     });
 
-    const userResult = await executeDbQuery(userSql, {
-      UserId: input.UserId
-    });
+//     const userResult = await executeDbQuery(userSql, {
+//       UserId: input.UserId
+//     });
 
-    const cleanClinics = clinicResult.records.map((row: any) => {
-      const cleaned: any = {};
-      for (const key in row) {
-        cleaned[key] = row[key] == null ? "" : row[key];
-      }
-      return cleaned;
-    });
+//     const cleanClinics = clinicResult.records.map((row: any) => {
+//       const cleaned: any = {};
+//       for (const key in row) {
+//         cleaned[key] = row[key] == null ? "" : row[key];
+//       }
+//       return cleaned;
+//     });
 
    
 
-    res.json({
-      status: 0,
-      clinics: cleanClinics,
-      defaultId: userResult?.records[0]?.CLNORGCODE
-    });
+//     res.json({
+//       status: 0,
+//       clinics: cleanClinics,
+//       defaultId: userResult?.records[0]?.CLNORGCODE
+//     });
 
-  } catch (err: any) {
-    res.status(500).json({ status: 1, result: err.message });
-  }
-}
+//   } catch (err: any) {
+//     res.status(500).json({ status: 1, result: err.message });
+//   }
+// }
   async login(req: Request, res: Response): Promise<void> {
     const input = req.body;
     const encryptedPassword = Buffer.from(input.password, "utf8").toString("base64");
