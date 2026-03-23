@@ -29,8 +29,8 @@ const apiRouter: Router = Router();
 app.use(cors());
 
 // --- Body Parsers ---
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({limit: '2mb'}));
+app.use(express.urlencoded({limit: '2mb', extended: true }));
 
 // --- Request Logger (runs once per request) ---
 app.use((req: Request, _res: Response, next: NextFunction) => {
