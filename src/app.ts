@@ -20,6 +20,7 @@ import rolesController from "./controllers/Security/roles";
 import activitiesController from "./controllers/Security/activities";
 import clinicToUserLinkController from "./controllers/Security/clinicToUserLink";
 import doctorController from "./controllers/Masters/doctorController";
+import serviceController from "./controllers/Masters/serviceController";
 
 
 const app: Application = express();
@@ -69,6 +70,7 @@ new rolesController(apiRouter);
 new activitiesController(apiRouter);
 new clinicToUserLinkController(apiRouter);
 new doctorController(apiRouter);
+new serviceController(apiRouter);
 
 
 app.use("/api", apiRouter);
