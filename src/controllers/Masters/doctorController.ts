@@ -252,7 +252,7 @@ async getDoctorMaster(req: Request, res: Response): Promise<void> {
       code:           r.code || "",
       FirstName:      r.FirstName || "",
       Mobile:         r.MobileNo || "",
-      Status:         r.Status || "",
+      Status :  r.Status === "A"    ? "Active"    : r.Status === "I"    ? "Inactive"    : "",
       Speciality_Name: r.Speciality_Name || "",
       Dept_Name:      r.DEPTNAME || "",
       Qualification:  r.Qualification || "",
