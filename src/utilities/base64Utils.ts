@@ -23,20 +23,24 @@ export function IsBase64(str: string): boolean {
   }
 }
 
-
-
 export function saveFileToFolder(
   base64Data: string,
   fileName: string,
   id: string,
-  folderType: string
+  folderType: string,
 ): string {
   try {
-    const doctorDocs = process.env.DOCTOR_DOCS || "DoctorDocs";
+    // guard — don't attempt save if no data or filename
+    if (!base64Data || !fileName) return '';
 
+    const doctorDocs = process.env.DOCTOR_DOCS || "DoctorDocs";
     // Equivalent to Server.MapPath("~/DoctorDocs/")
     let dirPath = path.join(process.cwd(), doctorDocs);
     let filePath = `~\\${doctorDocs}`;
+
+    if (base64Data.includes(",")) {
+      base64Data = base64Data.split(",")[1];
+    }
 
     // ~/DoctorDocs
     if (!fs.existsSync(dirPath)) {
@@ -69,4 +73,5 @@ export function saveFileToFolder(
     throw err;
   }
 }
+
 
