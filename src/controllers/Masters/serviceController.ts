@@ -1,19 +1,20 @@
 import { Request, Response, Router } from "express";
 import { executeDbQuery } from "../../db";
 import express from "express";
+import { authenticateToken } from "../../utilities/authMiddleWare";
 
 export default class serviceController {
 
-  
+  private router: Router = express.Router();
 
-  constructor(private router: Router) {
-    
-   router.get("/masters/getServicesDetails", this.getServicesDetails.bind(this));
-    router.get("/masters/getMainGroupDropDown", this.getMainGroupDropDown.bind(this));
-    router.get("/masters/getSubGroupDropDown", this.getSubGroupDropDown.bind(this));
-    router.get("/masters/getDepartmentDropDown", this.getDepartmentDropDown.bind(this));
-    router.get("/masters/getServiceTypeDropDown", this.getServiceTypeDropDown.bind(this));
-    router.get("/masters/getDoctorComponentDropDown", this.getDoctorComponentDropDown.bind(this));
+  constructor(private app: Router) {
+    app.use("/masters", this.router);
+    this.router.get("/getServicesDetails", authenticateToken, this.getServicesDetails.bind(this));
+    this.router.get("/getMainGroupDropDown", authenticateToken, this.getMainGroupDropDown.bind(this));
+    this.router.get("/getSubGroupDropDown", authenticateToken, this.getSubGroupDropDown.bind(this));
+    this.router.get("/getDepartmentDropDown", authenticateToken, this.getDepartmentDropDown.bind(this));
+    this.router.get("/getServiceTypeDropDown", authenticateToken, this.getServiceTypeDropDown.bind(this));
+    this.router.get("/getDoctorComponentDropDown", authenticateToken, this.getDoctorComponentDropDown.bind(this));
   }
 
   async getServicesDetails(req: Request, res: Response) {

@@ -14,6 +14,7 @@ export default class doctorChargeMasterController {
     this.router.get("/getConsultationTypes", authenticateToken, this.getConsultationTypes.bind(this),);
   }
 
+
   async getConsultationTypes(req: Request, res: Response): Promise<void> {
     const sql = `SELECT CONS_TYPEID, CONS_TYPE FROM DOCTOR_CONSULTATIONTYPE WHERE STATUS = 'A' ORDER BY CONS_TYPE`;
     try {
