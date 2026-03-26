@@ -20,7 +20,8 @@ export default class doctorController {
     this.router.get("/getDoctorDetails", authenticateToken, this.getDoctorDetails.bind(this));
     this.router.get("/getCurrency", authenticateToken, this.getCurrency.bind(this));
     this.router.get("/getChargeDetails", authenticateToken, this.getChargeDetails.bind(this));
-    this.router.post("/insertDetails", authenticateToken, this.insertDetails.bind(this));
+    // this.router.post("/
+    //   ", authenticateToken, this.insertDetails.bind(this));
     this.router.post("/insertDoctorMaster", authenticateToken, this.insertDoctorMaster.bind(this));
      this.router.get("/GetDoct_Languages", authenticateToken, this.GetDoct_Languages.bind(this));
      this.router.post("/updateDoctorMaster", authenticateToken, this.updateDoctorMaster.bind(this));
