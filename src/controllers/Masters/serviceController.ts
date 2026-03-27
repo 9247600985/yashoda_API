@@ -24,6 +24,8 @@
 
       // New: Auto-generate service code
       this.router.get("/getNextServiceCode", authenticateToken, this.getNextServiceCode.bind(this));
+      //  this.router.get("/getTariffCategoryDropDown", authenticateToken, this.getTariffCategoryDropDown.bind(this));
+this.router.get("/getRevisionDropDown", authenticateToken, this.getRevisionDropDown.bind(this));       
     }
 
   
@@ -320,4 +322,34 @@
         res.status(500).json({ status: 1, message: err.message });
       }
     }
+  //     async getTariffCategoryDropDown(req: Request, res: Response) {
+  //       const sql = `
+  //   SELECT TARIFFID, TARIFFDESC 
+  //   FROM  MST_TARIFFCATGORY
+  //   WHERE REC_STATUS = 'A'
+  //   ORDER BY TARIFFDESC
+  // `;
+  //       try {
+  //           const { records } = await executeDbQuery(sql);
+  //           res.json({ status: 0, d: records });
+  //       } catch (err: any) {
+  //           res.status(500).json({ status: 1, message: err.message });
+  //       }
+  //   }
+    async getRevisionDropDown(req: Request, res: Response) {
+  const sql = `
+    SELECT REVISIONID AS value, REVISIONID AS label
+    FROM MST_REVISION
+    WHERE REV_STATUS = 'Y'
+    ORDER BY REVISIONID
+  `;
+
+  try {
+    const { records } = await executeDbQuery(sql);
+    // Add default "-Select-" option
+    res.json({ status: 0, d: [{ value: '', label: '-Select-' }, ...records] });
+  } catch (err: any) {
+    res.status(500).json({ status: 1, message: err.message });
+  }
+}
   }
