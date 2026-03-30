@@ -1,79 +1,127 @@
-  import { Request, Response, Router } from "express";
-  import { executeDbQuery } from "../../db";
-  import express from "express";
-  import { authenticateToken } from "../../utilities/authMiddleWare";
+import { Request, Response, Router } from "express";
+import { executeDbQuery } from "../../db";
+import express from "express";
+import { authenticateToken } from "../../utilities/authMiddleWare";
 
-  export default class serviceController {
+export default class serviceController {
 
-    private router: Router = express.Router();
+  private router: Router = express.Router();
 
-    constructor(private app: Router) {
-      app.use("/masters", this.router);
+  constructor(private app: Router) {
+    app.use("/masters", this.router);
 
-      // Dropdowns
-      this.router.get("/getServicesDetails", authenticateToken, this.getServicesDetails.bind(this));
-      this.router.get("/getMainGroupDropDown", authenticateToken, this.getMainGroupDropDown.bind(this));
-      this.router.get("/getSubGroupDropDown", authenticateToken, this.getSubGroupDropDown.bind(this));
-      this.router.get("/getDepartmentDropDown", authenticateToken, this.getDepartmentDropDown.bind(this));
-      this.router.get("/getServiceTypeDropDown", authenticateToken, this.getServiceTypeDropDown.bind(this));
-      this.router.get("/getDoctorComponentDropDown", authenticateToken, this.getDoctorComponentDropDown.bind(this));
+    // Dropdowns
+    this.router.get("/getServicesDetails", authenticateToken, this.getServicesDetails.bind(this));
+    this.router.get("/getMainGroupDropDown", authenticateToken, this.getMainGroupDropDown.bind(this));
+    this.router.get("/getSubGroupDropDown", authenticateToken, this.getSubGroupDropDown.bind(this));
+    this.router.get("/getDepartmentDropDown", authenticateToken, this.getDepartmentDropDown.bind(this));
+    this.router.get("/getServiceTypeDropDown", authenticateToken, this.getServiceTypeDropDown.bind(this));
+    this.router.get("/getDoctorComponentDropDown", authenticateToken, this.getDoctorComponentDropDown.bind(this));
 
-      // CRUD
-      this.router.post("/saveServiceDetails", authenticateToken, this.saveServiceDetails.bind(this));
-      this.router.post("/updateServiceDetails", authenticateToken, this.updateServiceDetails.bind(this));
+    // CRUD
+    this.router.post("/saveServiceDetails", authenticateToken, this.saveServiceDetails.bind(this));
+    this.router.post("/updateServiceDetails", authenticateToken, this.updateServiceDetails.bind(this));
 
-      // New: Auto-generate service code
-      this.router.get("/getNextServiceCode", authenticateToken, this.getNextServiceCode.bind(this));
-      //  this.router.get("/getTariffCategoryDropDown", authenticateToken, this.getTariffCategoryDropDown.bind(this));
-this.router.get("/getRevisionDropDown", authenticateToken, this.getRevisionDropDown.bind(this));       
-    }
+    // New: Auto-generate service code
+    this.router.get("/getNextServiceCode", authenticateToken, this.getNextServiceCode.bind(this));
+     this.router.get("/getTariffCategoryDropDown", authenticateToken, this.getTariffCategoryDropDown.bind(this));
+    this.router.get("/getRevisionDropDown", authenticateToken, this.getRevisionDropDown.bind(this));
+    this.router.get("/getServicescostDetails", authenticateToken, this.getServicescostDetails.bind(this))
+  }
 
-  
- async getNextServiceCode(req: Request, res: Response) {
-  try {
-    // Get the last service code ordered descending
+  async getServicescostDetails(req: Request, res: Response) {
     const sql = `
+       SELECT 
+  M.SERVCODE, 
+  M.SERVNAME, 
+  M.SRVGRPCODE, 
+ 
+  C.SRVGRPDESC, 
+  B.SUBGRPCODE, 
+  B.SUBGRPNAME, 
+  T.SRVTYPCODE, 
+  T.SRVTYPNAME,
+  M.STATUS, 
+  M.DEPTCODE, 
+  M.DOC_COMP, 
+  M.TARIFFID,
+ 
+  M.IsDiscountAlwd,
+  M.MaxDiscountPer, 
+  M.PATIENTTYPE, 
+  M.RATEEDIT, 
+  M.NAMEEDIT,
+  M.OPIPPACKGE, 
+  M.SERVTESTTYPE, 
+  M.SERVAPPSEX, 
+  M.ISTESTEXTCNTR,
+  M.QTY_EDITABLE, 
+  M.ISDAYCARE, 
+  M.ONLINEBOOK_YN
+FROM MST_SERVICES M
+
+LEFT JOIN MST_SERVGROUPS C 
+  ON C.SRVGRPCODE = M.SRVGRPCODE
+LEFT JOIN MST_SERVSUBGRP B 
+  ON B.SUBGRPCODE = M.SRVSUBGRP
+LEFT JOIN MST_SERTYPEMST T 
+  ON T.SRVTYPCODE = M.SERVTYPECD
+ORDER BY M.SERVCODE
+      `;
+
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async getNextServiceCode(req: Request, res: Response) {
+    try {
+      // Get the last service code ordered descending
+      const sql = `
       SELECT TOP 1 SERVCODE
       FROM MST_SERVICES
       ORDER BY SERVCODE DESC
     `;
-    const { records } = await executeDbQuery(sql);
+      const { records } = await executeDbQuery(sql);
 
-    let nextCode: string;
+      let nextCode: string;
 
-    if (records.length > 0 && records[0].SERVCODE) {
-      const lastCode = records[0].SERVCODE;
+      if (records.length > 0 && records[0].SERVCODE) {
+        const lastCode = records[0].SERVCODE;
 
-      // Extract numeric suffix (digits at the end of the code)
-      const match = lastCode.match(/(\d+)$/);
-      const prefix = lastCode.replace(/(\d+)$/, ''); // everything before digits
-      let number = match ? parseInt(match[1], 10) : 0;
+        // Extract numeric suffix (digits at the end of the code)
+        const match = lastCode.match(/(\d+)$/);
+        const prefix = lastCode.replace(/(\d+)$/, ''); // everything before digits
+        let number = match ? parseInt(match[1], 10) : 0;
 
-      number += 1;
+        number += 1;
 
-      const numberLength = match ? match[1].length : 3;
-      const nextNumberStr = number.toString().padStart(numberLength, '0');
+        const numberLength = match ? match[1].length : 3;
+        const nextNumberStr = number.toString().padStart(numberLength, '0');
 
-      nextCode = prefix + nextNumberStr;
-    } else {
-      // Table is empty, use default pattern automatically
-      // You can choose a prefix like 'S' + 001 if you want dynamic generation
-      nextCode = 'S001'; 
+        nextCode = prefix + nextNumberStr;
+      } else {
+        // Table is empty, use default pattern automatically
+        // You can choose a prefix like 'S' + 001 if you want dynamic generation
+        nextCode = 'S001';
+      }
+
+      res.json({ status: 0, SERVCODE: nextCode });
+    } catch (err: any) {
+      console.error('GENERATE SERVCODE ERROR:', err);
+      res.status(500).json({ status: 1, message: err.message });
     }
-
-    res.json({ status: 0, SERVCODE: nextCode });
-  } catch (err: any) {
-    console.error('GENERATE SERVCODE ERROR:', err);
-    res.status(500).json({ status: 1, message: err.message });
   }
-}
-    // =========================
-    // SAVE
-    // =========================
-    async saveServiceDetails(req: Request, res: Response) {
-      const data = req.body;
+  // =========================
+  // SAVE
+  // =========================
+  async saveServiceDetails(req: Request, res: Response) {
+    const data = req.body;
 
-      const sql = `
+    const sql = `
         INSERT INTO MST_SERVICES (
           SERVCODE,
           SERVNAME,
@@ -124,46 +172,46 @@ this.router.get("/getRevisionDropDown", authenticateToken, this.getRevisionDropD
         )
       `;
 
-      try {
-        await executeDbQuery(sql, {
-          SERVCODE: data.SERVCODE,
-          SERVNAME: data.SERVNAME,
-          SRVGRPCODE: data.SRVGRPCODE,
-          SRVSUBGRP: data.SUBGRPCODE,
-          SERVTYPECD: data.SRVTYPCODE,
-          STATUS: data.STATUS,
-          MNEUNONIC: data.SERVNAME?.slice(0, 10),
-          DEPTCODE: data.DEPTCODE,
-          DOC_COMP: data.DOC_COMP,
-          IsDiscountAlwd: 'Y',
-          MaxDiscountPer: data.MaxDiscountPer ?? 0,
-          PATIENTTYPE: data.PATIENTTYPE,
-          RATEEDIT: data.RATEEDIT,
-          NAMEEDIT: data.NAMEEDIT,
-          OPIPPACKGE: data.OPIPPACKGE,
-          SERVTESTTYPE: data.SERVTESTTYPE,
-          SERVAPPSEX: data.SERVAPPSEX,
-          ISTESTEXTCNTR: data.ISTESTEXTCNTR === 'Y' ? 'Y' : 'N',
-          QTY_EDITABLE: data.QTY_EDITABLE === 'Y' ? 'Y' : 'N',
-          ISDAYCARE: data.ISDAYCARE === 'Y' ? 'Y' : 'N',
-          ONLINEBOOK_YN: data.ONLINEBOOK_YN
-        });
+    try {
+      await executeDbQuery(sql, {
+        SERVCODE: data.SERVCODE,
+        SERVNAME: data.SERVNAME,
+        SRVGRPCODE: data.SRVGRPCODE,
+        SRVSUBGRP: data.SUBGRPCODE,
+        SERVTYPECD: data.SRVTYPCODE,
+        STATUS: data.STATUS,
+        MNEUNONIC: data.SERVNAME?.slice(0, 10),
+        DEPTCODE: data.DEPTCODE,
+        DOC_COMP: data.DOC_COMP,
+        IsDiscountAlwd: 'Y',
+        MaxDiscountPer: data.MaxDiscountPer ?? 0,
+        PATIENTTYPE: data.PATIENTTYPE,
+        RATEEDIT: data.RATEEDIT,
+        NAMEEDIT: data.NAMEEDIT,
+        OPIPPACKGE: data.OPIPPACKGE,
+        SERVTESTTYPE: data.SERVTESTTYPE,
+        SERVAPPSEX: data.SERVAPPSEX,
+        ISTESTEXTCNTR: data.ISTESTEXTCNTR === 'Y' ? 'Y' : 'N',
+        QTY_EDITABLE: data.QTY_EDITABLE === 'Y' ? 'Y' : 'N',
+        ISDAYCARE: data.ISDAYCARE === 'Y' ? 'Y' : 'N',
+        ONLINEBOOK_YN: data.ONLINEBOOK_YN
+      });
 
-        res.json({ status: 0, message: 'Service inserted successfully' });
+      res.json({ status: 0, message: 'Service inserted successfully' });
 
-      } catch (err: any) {
-        console.error('INSERT ERROR:', err);
-        res.status(500).json({ status: 1, message: err.message });
-      }
+    } catch (err: any) {
+      console.error('INSERT ERROR:', err);
+      res.status(500).json({ status: 1, message: err.message });
     }
+  }
 
-    // =========================
-    // UPDATE
-    // =========================
-    async updateServiceDetails(req: Request, res: Response) {
-      const data = req.body;
+  // =========================
+  // UPDATE
+  // =========================
+  async updateServiceDetails(req: Request, res: Response) {
+    const data = req.body;
 
-      const sql = `
+    const sql = `
         UPDATE MST_SERVICES SET
           SERVNAME = @SERVNAME,
           SRVGRPCODE = @SRVGRPCODE,
@@ -188,44 +236,44 @@ this.router.get("/getRevisionDropDown", authenticateToken, this.getRevisionDropD
         WHERE SERVCODE = @SERVCODE
       `;
 
-      try {
-        await executeDbQuery(sql, {
-          SERVCODE: data.SERVCODE,
-          SERVNAME: data.SERVNAME,
-          SRVGRPCODE: data.SRVGRPCODE,
-          SRVSUBGRP: data.SUBGRPCODE,
-          SERVTYPECD: data.SRVTYPCODE,
-          STATUS: data.STATUS,
-          MNEUNONIC: data.SERVNAME?.slice(0, 10),
-          DEPTCODE: data.DEPTCODE,
-          DOC_COMP: data.DOC_COMP,
-          IsDiscountAlwd: 'Y',
-          MaxDiscountPer: data.MaxDiscountPer ?? 0,
-          PATIENTTYPE: data.PATIENTTYPE,
-          RATEEDIT: data.RATEEDIT,
-          NAMEEDIT: data.NAMEEDIT,
-          OPIPPACKGE: data.OPIPPACKGE,
-          SERVTESTTYPE: data.SERVTESTTYPE,
-          SERVAPPSEX: data.SERVAPPSEX,
-          ISTESTEXTCNTR: data.ISTESTEXTCNTR === 'Y' ? 'Y' : 'N',
-          QTY_EDITABLE: data.QTY_EDITABLE === 'Y' ? 'Y' : 'N',
-          ISDAYCARE: data.ISDAYCARE === 'Y' ? 'Y' : 'N',
-          ONLINEBOOK_YN: data.ONLINEBOOK_YN
-        });
+    try {
+      await executeDbQuery(sql, {
+        SERVCODE: data.SERVCODE,
+        SERVNAME: data.SERVNAME,
+        SRVGRPCODE: data.SRVGRPCODE,
+        SRVSUBGRP: data.SUBGRPCODE,
+        SERVTYPECD: data.SRVTYPCODE,
+        STATUS: data.STATUS,
+        MNEUNONIC: data.SERVNAME?.slice(0, 10),
+        DEPTCODE: data.DEPTCODE,
+        DOC_COMP: data.DOC_COMP,
+        IsDiscountAlwd: 'Y',
+        MaxDiscountPer: data.MaxDiscountPer ?? 0,
+        PATIENTTYPE: data.PATIENTTYPE,
+        RATEEDIT: data.RATEEDIT,
+        NAMEEDIT: data.NAMEEDIT,
+        OPIPPACKGE: data.OPIPPACKGE,
+        SERVTESTTYPE: data.SERVTESTTYPE,
+        SERVAPPSEX: data.SERVAPPSEX,
+        ISTESTEXTCNTR: data.ISTESTEXTCNTR === 'Y' ? 'Y' : 'N',
+        QTY_EDITABLE: data.QTY_EDITABLE === 'Y' ? 'Y' : 'N',
+        ISDAYCARE: data.ISDAYCARE === 'Y' ? 'Y' : 'N',
+        ONLINEBOOK_YN: data.ONLINEBOOK_YN
+      });
 
-        res.json({ status: 0, message: 'Service updated successfully' });
+      res.json({ status: 0, message: 'Service updated successfully' });
 
-      } catch (err: any) {
-        console.error('UPDATE ERROR:', err);
-        res.status(500).json({ status: 1, message: err.message });
-      }
+    } catch (err: any) {
+      console.error('UPDATE ERROR:', err);
+      res.status(500).json({ status: 1, message: err.message });
     }
+  }
 
-    // =========================
-    // GET ALL SERVICES
-    // =========================
-    async getServicesDetails(req: Request, res: Response) {
-      const sql = `
+  // =========================
+  // GET ALL SERVICES
+  // =========================
+  async getServicesDetails(req: Request, res: Response) {
+    const sql = `
         SELECT 
           M.SERVCODE, M.SERVNAME, M.SRVGRPCODE, C.SRVGRPDESC, 
           B.SUBGRPCODE, B.SUBGRPNAME, T.SRVTYPCODE, T.SRVTYPNAME,
@@ -240,116 +288,123 @@ this.router.get("/getRevisionDropDown", authenticateToken, this.getRevisionDropD
         ORDER BY M.SERVCODE
       `;
 
-      try {
-        const { records } = await executeDbQuery(sql);
-        res.json({ status: 0, d: records });
-      } catch (err: any) {
-        res.status(500).json({ status: 1, message: err.message });
-      }
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
     }
+  }
 
-    // =========================
-    // DROPDOWN APIs
-    // =========================
-    async getMainGroupDropDown(req: Request, res: Response) {
-      const sql = `
+  // =========================
+  // DROPDOWN APIs
+  // =========================
+  async getMainGroupDropDown(req: Request, res: Response) {
+    const sql = `
         SELECT SRVGRPCODE AS value, SRVGRPDESC AS label
         FROM MST_SERVGROUPS
         WHERE REC_STATUS = 'A'
         ORDER BY SRVGRPDESC
       `;
-      try {
-        const { records } = await executeDbQuery(sql);
-        res.json({ status: 0, d: [{ value: '', label: '-Select-' }, ...records] });
-      } catch (err: any) {
-        res.status(500).json({ status: 1, message: err.message });
-      }
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: [{ value: '', label: '-Select-' }, ...records] });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
     }
+  }
 
-    async getSubGroupDropDown(req: Request, res: Response) {
-      const sql = `
+  async getSubGroupDropDown(req: Request, res: Response) {
+    const sql = `
         SELECT SUBGRPCODE AS value, SUBGRPNAME AS label
         FROM MST_SERVSUBGRP
         WHERE REC_STATUS = 'A'
         ORDER BY SUBGRPNAME
       `;
-      try {
-        const { records } = await executeDbQuery(sql);
-        res.json({ status: 0, d: [{ value: '', label: '-Select-' }, ...records] });
-      } catch (err: any) {
-        res.status(500).json({ status: 1, message: err.message });
-      }
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: [{ value: '', label: '-Select-' }, ...records] });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
     }
+  }
 
-    async getDepartmentDropDown(req: Request, res: Response) {
-      const sql = `
+  async getDepartmentDropDown(req: Request, res: Response) {
+    const sql = `
         SELECT DEPTCODE AS value, DEPTNAME AS label
         FROM Mst_Department
         ORDER BY DEPTNAME
       `;
-      try {
-        const { records } = await executeDbQuery(sql);
-        res.json({ status: 0, d: [{ value: '', label: '-Select-' }, ...records] });
-      } catch (err: any) {
-        res.status(500).json({ status: 1, message: err.message });
-      }
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: [{ value: '', label: '-Select-' }, ...records] });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
     }
+  }
 
-    async getServiceTypeDropDown(req: Request, res: Response) {
-      const sql = `
+  async getServiceTypeDropDown(req: Request, res: Response) {
+    const sql = `
         SELECT SRVTYPCODE AS value, SRVTYPNAME AS label
         FROM MST_SERTYPEMST
         ORDER BY SRVTYPNAME
       `;
-      try {
-        const { records } = await executeDbQuery(sql);
-        res.json({ status: 0, d: [{ value: '', label: '-Select-' }, ...records] });
-      } catch (err: any) {
-        res.status(500).json({ status: 1, message: err.message });
-      }
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: [{ value: '', label: '-Select-' }, ...records] });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
     }
+  }
 
-    async getDoctorComponentDropDown(req: Request, res: Response) {
-      const sql = `
+  async getDoctorComponentDropDown(req: Request, res: Response) {
+    const sql = `
         SELECT Code AS value, Doctor_Component AS label
         FROM Mst_DoctorShare
         ORDER BY Doctor_Component
       `;
-      try {
-        const { records } = await executeDbQuery(sql);
-        res.json({ status: 0, d: [{ value: '', label: '-Select-' }, ...records] });
-      } catch (err: any) {
-        res.status(500).json({ status: 1, message: err.message });
-      }
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: [{ value: '', label: '-Select-' }, ...records] });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
     }
-  //     async getTariffCategoryDropDown(req: Request, res: Response) {
-  //       const sql = `
-  //   SELECT TARIFFID, TARIFFDESC 
-  //   FROM  MST_TARIFFCATGORY
-  //   WHERE REC_STATUS = 'A'
-  //   ORDER BY TARIFFDESC
-  // `;
-  //       try {
-  //           const { records } = await executeDbQuery(sql);
-  //           res.json({ status: 0, d: records });
-  //       } catch (err: any) {
-  //           res.status(500).json({ status: 1, message: err.message });
-  //       }
-  //   }
-    async getRevisionDropDown(req: Request, res: Response) {
+  }
+  async getTariffCategoryDropDown(req: Request, res: Response) {
   const sql = `
+    SELECT 
+      TARIFFID AS value,
+      TARIFFDESC AS label
+    FROM MST_TARIFFCATGORY
+    WHERE REC_STATUS = 'A'
+    ORDER BY TARIFFDESC
+  `;
+
+  try {
+    const { records } = await executeDbQuery(sql);
+    res.json({
+      status: 0,
+      d: [{ value: '', label: '-Select-' }, ...records]
+    });
+  } catch (err: any) {
+    console.error("TARIFF ERROR:", err);
+    res.status(500).json({ status: 1, message: err.message });
+  }
+}
+  async getRevisionDropDown(req: Request, res: Response) {
+    const sql = `
     SELECT REVISIONID AS value, REVISIONID AS label
     FROM MST_REVISION
     WHERE REV_STATUS = 'Y'
     ORDER BY REVISIONID
   `;
 
-  try {
-    const { records } = await executeDbQuery(sql);
-    // Add default "-Select-" option
-    res.json({ status: 0, d: [{ value: '', label: '-Select-' }, ...records] });
-  } catch (err: any) {
-    res.status(500).json({ status: 1, message: err.message });
+    try {
+      const { records } = await executeDbQuery(sql);
+      // Add default "-Select-" option
+      res.json({ status: 0, d: [{ value: '', label: '-Select-' }, ...records] });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
   }
 }
-  }

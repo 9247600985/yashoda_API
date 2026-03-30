@@ -22,7 +22,7 @@ import clinicToUserLinkController from "./controllers/Security/clinicToUserLink"
 import doctorController from "./controllers/Masters/doctorController";
 import serviceController from "./controllers/Masters/serviceController";
 import doctorChargeMasterController from "./controllers/Masters/doctorChargeMasterController";
-import servicecostController from './controllers/Masters/ServicecostController';
+// import servicecostController from './controllers/Masters/ServicecostController';
 
 const app: Application = express();
 const apiRouter: Router = Router();
@@ -73,7 +73,7 @@ new clinicToUserLinkController(apiRouter);
 new doctorController(apiRouter);
 new serviceController(apiRouter);
 new doctorChargeMasterController(apiRouter);
-new servicecostController(apiRouter)
+// new servicecostController(apiRouter)
 
 
 app.use("/api", apiRouter);
