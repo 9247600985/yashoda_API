@@ -124,5 +124,6 @@ async GetUserClinicData(req: Request, res: Response): Promise<void> {
       res.status(403).json({ status: 1, result: "Invalid or expired refresh token" });
     }
   }
+  
 
 }
