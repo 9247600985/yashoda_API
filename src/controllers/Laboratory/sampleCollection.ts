@@ -11,13 +11,33 @@ export default class sampleCollectionController {
 
     this.router.get("/orders", authenticateToken, this.getOrders.bind(this));
     this.router.get("/tests", authenticateToken, this.getTests.bind(this));
-    this.router.get("/order-details", authenticateToken, this.getOrderDetails.bind(this));
+    this.router.get(
+      "/order-details",
+      authenticateToken,
+      this.getOrderDetails.bind(this),
+    );
 
-    this.router.post("/update-status", authenticateToken, this.changeStatus.bind(this));
-    this.router.post("/submit-sample", authenticateToken, this.updateDGLORDERTRN.bind(this));
+    this.router.post(
+      "/update-status",
+      authenticateToken,
+      this.changeStatus.bind(this),
+    );
+    this.router.post(
+      "/submit-sample",
+      authenticateToken,
+      this.updateDGLORDERTRN.bind(this),
+    );
 
-    this.router.get("/departments", authenticateToken, this.getLabDepartments.bind(this));
-    this.router.get("/companies", authenticateToken, this.getCompanies.bind(this));
+    this.router.get(
+      "/departments",
+      authenticateToken,
+      this.getLabDepartments.bind(this),
+    );
+    this.router.get(
+      "/companies",
+      authenticateToken,
+      this.getCompanies.bind(this),
+    );
   }
 
   // ===== COMPANIES =====
@@ -56,36 +76,105 @@ export default class sampleCollectionController {
   async getOrders(req: Request, res: Response) {
     try {
       const input = req.query;
+      const { fromDate, toDate, section, priority, hospitalId, sampleStatus, patientType, companyId } = input as any;
 
       const params: any = {
-        fromDate: `${input.fromDate} 00:00:00`,
-        toDate: `${input.toDate} 23:59:59`,
-        section: input.section ?? '',
-        priority: `%${input.priority ?? ''}%`,
-        hospitalId: input.hospitalId,
+        fromDate,
+        toDate,
+        section: section || "",
+        priority: priority || "",
+        hospitalId,
+        sampleStatus: sampleStatus || "A",
+        patientType: patientType || "A",
+        companyId: companyId || "",
+        labType: "01",
       };
 
       console.log("ORDERS PARAMS:", params);
 
+      // Test query to check if there's any data
+      const testQuery = `SELECT COUNT(*) as total FROM DGL_ORDERMST WHERE CLNORGCODE = @hospitalId`;
+      const testResult = await executeDbQuery(testQuery, { hospitalId });
+      console.log("Total orders in database for hospital:", testResult.records[0]);
+
       const query = `
-        SELECT DISTINCT
-          om.ORDERNO,
-          CONVERT(VARCHAR(10), om.ORDERDATE, 120) AS ORDERDATE,
-          CONVERT(VARCHAR(8), om.ORDERTIME, 108) AS ORDERTIME,
-          om.MEDRECNO AS MRNUMBER,
-          om.IPNO AS IPNUMBER,
-          om.PATNAME AS PATIENTNAME,
-          ot.SAMPLESTATUS,
-          om.PRIORITY
-        FROM DGL_ORDERMST om
-        INNER JOIN DGL_ORDERTRN ot ON om.ORDERNO = ot.ORDERNO
-        WHERE om.ORDERDATE BETWEEN @fromDate AND @toDate
-          AND om.CLNORGCODE = @hospitalId
-          AND om.LABTYPECD = '01'
-          AND (@section = '' OR ot.LABDPTCODE = @section)
-          AND om.PRIORITY LIKE @priority
-        ORDER BY ORDERDATE DESC
-      `;
+      SELECT DISTINCT
+    om.sex,
+    om.ORDERNO,
+    CONVERT(VARCHAR(11), om.ORDERDATE, 106) AS ORDERDATE,
+    CONVERT(VARCHAR(8), om.ORDERTIME, 108) AS ORDERTIME,
+    om.MEDRECNO,
+    om.IPNO,
+    om.PATNAME,
+    ot.TESTSTATUS AS SAMPLESTATUS,
+    om.PRIORITY,
+    om.WARDNO,
+    om.AGE,
+    dt.Firstname,
+    pm.Mobile
+FROM DGL_ORDERMST om
+INNER JOIN DGL_ORDERTRN ot ON om.ORDERNO = ot.ORDERNO
+
+-- COMMON JOINS
+LEFT JOIN Patient_Master pm ON pm.PatientMr_No = om.MEDRECNO
+LEFT JOIN Mst_DoctorMaster dt ON dt.Code = om.ORDEREDBY
+
+-- CONDITIONAL JOINS
+LEFT JOIN OPD_BILLMST OB 
+    ON OB.BILLNO = om.BILLNO AND om.ORDERTYPE = 'O'
+
+LEFT JOIN IPD_ADMISSION IA 
+    ON IA.IPNO = om.IPNO AND om.ORDERTYPE = 'I'
+
+WHERE 
+    CAST(om.ORDERDATE AS DATE) BETWEEN CAST(@fromDate AS DATE) AND CAST(@toDate AS DATE)
+    AND om.STATUS = 'A'
+    AND om.ORDER_STATUS <> 'OR'
+    AND om.LABTYPECD = @labType
+    AND om.CLNORGCODE = @hospitalId
+
+-- SECTION
+AND (LEN(@section) = 0 OR ot.LABDPTCODE = @section)
+
+-- PATIENT TYPE
+AND (@patientType = 'A' OR om.PATTYPE = @patientType)
+
+-- PRIORITY
+AND (LEN(@priority) = 0 OR om.PRIORITY LIKE '%' + @priority + '%')
+
+-- SAMPLE STATUS LOGIC
+AND (
+    @sampleStatus = 'A'
+    OR (
+        @sampleStatus = 'C' 
+        AND ot.TESTSTATUS IN ('SA','RE','RV','RD')
+    )
+    OR (
+        @sampleStatus LIKE '%,%' 
+        AND ot.TESTSTATUS IN (
+            SELECT LTRIM(RTRIM(value)) 
+            FROM STRING_SPLIT(@sampleStatus, ',')
+        )
+    )
+    OR (
+        @sampleStatus NOT LIKE '%,%' 
+        AND @sampleStatus <> 'A' 
+        AND @sampleStatus <> 'C'
+        AND ot.TESTSTATUS = @sampleStatus
+    )
+)
+
+-- COMPANY FILTER (BOTH OP + IP)
+AND (
+    LEN(@companyId) = 0
+    OR (
+        (om.ORDERTYPE = 'O' AND (OB.CRDCOMPCD = @companyId OR OB.CRDCOMPCD LIKE @companyId + '%'))
+        OR
+        (om.ORDERTYPE = 'I' AND (IA.CRDCOMPCD = @companyId OR IA.CRDCOMPCD LIKE @companyId + '%'))
+    )
+)
+
+ORDER BY om.MEDRECNO`;
 
       const { records } = await executeDbQuery(query, params);
 
@@ -105,7 +194,8 @@ export default class sampleCollectionController {
         fromDate: `${input.fromDate} 00:00:00`,
         toDate: `${input.toDate} 23:59:59`,
         hospitalId: input.hospitalId,
-        deptcode: input.section ?? '',
+        deptcode: input.section ?? "",
+        orderNo: input.orderNo,
       };
 
       console.log("TESTS PARAMS:", params);
@@ -128,6 +218,7 @@ export default class sampleCollectionController {
         LEFT JOIN DGL_SPECIMENMAST sm ON tm.SPECCODE = sm.SPECCODE
         LEFT JOIN DGL_ContainerMAST cm ON tm.CONTCODE = cm.CONTCODE
         WHERE ot.SAMCOLDATE BETWEEN @fromDate AND @toDate
+          AND ot.ORDERNO = @orderNo
           AND ot.CLNORGCODE = @hospitalId
           AND (@deptcode = '' OR tm.LABDPTCODE = @deptcode)
         ORDER BY ot.SAMCOLDATE DESC
@@ -195,7 +286,7 @@ export default class sampleCollectionController {
             orderNo: row.ORDERNO,
             testCode: row.TESTCODE,
           },
-          { transaction }
+          { transaction },
         );
       }
 
@@ -231,7 +322,7 @@ export default class sampleCollectionController {
             testCode: row.testCode,
             hospitalId,
           },
-          { transaction }
+          { transaction },
         );
       }
 
