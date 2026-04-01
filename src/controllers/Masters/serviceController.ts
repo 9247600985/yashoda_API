@@ -26,47 +26,68 @@ export default class serviceController {
     this.router.get("/getNextServiceCode", authenticateToken, this.getNextServiceCode.bind(this));
      this.router.get("/getTariffCategoryDropDown", authenticateToken, this.getTariffCategoryDropDown.bind(this));
     this.router.get("/getRevisionDropDown", authenticateToken, this.getRevisionDropDown.bind(this));
-    this.router.get("/getServicescostDetails", authenticateToken, this.getServicescostDetails.bind(this))
+    this.router.get("/getServicescostDetails", authenticateToken, this.getServicescostDetails.bind(this));
+    this.router.get("/getServiceRateDetails",authenticateToken,this.getServiceRateDetails.bind(this));
+    this.router.post("/saveServiceCost",authenticateToken,this.saveServiceCost.bind(this));
+    this.router.get("/getLocationDropDown", authenticateToken, this.getLocationDropDown.bind(this));
   }
+  async getLocationDropDown(req: Request, res: Response) {
+  const sql = `
+    SELECT 
+      Hospital_Id AS value,
+      HospitalName AS label
+    FROM HOSPITALSLIST
+    ORDER BY HospitalName
+  `;
 
+  try {
+    const { records } = await executeDbQuery(sql);
+    res.json({
+      status: 0,
+      d: [{ value: '', label: '-Select-' }, ...records]
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 1, message: err.message });
+  }
+}
+async getServiceRateDetails(req: Request, res: Response) {
+  const { code, CLNORGCODE, REVISIONID } = req.query;
+ const orgCode = CLNORGCODE as string;
+  const sql = `
+    SELECT DISTINCT 
+      SC.SERVICECOST,
+      SC.DOCTSHAREAMT,
+      SC.BEDCATGCODE,
+      BD.BEDCATGNM
+    FROM MST_SERVICECOST SC
+    LEFT JOIN MST_BEDCATGMST BD 
+      ON BD.BEDCATGCD = SC.BEDCATGCODE
+    WHERE SC.SERVCODE = @code
+      AND SC.TARIFFID = '001'    
+      AND SC.REVISIONID = @REVISIONID  
+      AND SC.BEDCATGCODE IN (
+        SELECT BEDCATGCD 
+        FROM MST_BEDCATGMST 
+        WHERE CLNORGCODE = @CLNORGCODE 
+          AND REC_STATUS = 'A'
+      )
+  `;
+
+  try {
+    const { records } = await executeDbQuery(sql, {
+      code,
+      CLNORGCODE: orgCode,
+      REVISIONID
+    });
+
+    res.json({ status: 0, d: records });
+  } catch (err: any) {
+    res.status(500).json({ status: 1, message: err.message });
+  }
+}
   async getServicescostDetails(req: Request, res: Response) {
     const sql = `
-       SELECT 
-  M.SERVCODE, 
-  M.SERVNAME, 
-  M.SRVGRPCODE, 
- 
-  C.SRVGRPDESC, 
-  B.SUBGRPCODE, 
-  B.SUBGRPNAME, 
-  T.SRVTYPCODE, 
-  T.SRVTYPNAME,
-  M.STATUS, 
-  M.DEPTCODE, 
-  M.DOC_COMP, 
-  M.TARIFFID,
- 
-  M.IsDiscountAlwd,
-  M.MaxDiscountPer, 
-  M.PATIENTTYPE, 
-  M.RATEEDIT, 
-  M.NAMEEDIT,
-  M.OPIPPACKGE, 
-  M.SERVTESTTYPE, 
-  M.SERVAPPSEX, 
-  M.ISTESTEXTCNTR,
-  M.QTY_EDITABLE, 
-  M.ISDAYCARE, 
-  M.ONLINEBOOK_YN
-FROM MST_SERVICES M
-
-LEFT JOIN MST_SERVGROUPS C 
-  ON C.SRVGRPCODE = M.SRVGRPCODE
-LEFT JOIN MST_SERVSUBGRP B 
-  ON B.SUBGRPCODE = M.SRVSUBGRP
-LEFT JOIN MST_SERTYPEMST T 
-  ON T.SRVTYPCODE = M.SERVTYPECD
-ORDER BY M.SERVCODE
+      select M.SERVCODE,M.SERVNAME,M.SRVGRPCODE,C.SRVGRPDESC,B.SUBGRPCODE,B.SUBGRPNAME,t.SRVTYPCODE,t.SRVTYPNAME,M.STATUS,M.DOC_COMP from MST_SERVICES M  left join MST_SERVGROUPS C on C.SRVGRPCODE = M.SRVGRPCODE left join  MST_SERVSUBGRP B on B.SUBGRPCODE=M.SRVSUBGRP left join  MST_SERTYPEMST t on t.SRVTYPCODE= M.SERVTYPECD where M.SRVGRPCODE like '%%'   order by M.SERVCODE
       `;
 
     try {
@@ -77,6 +98,54 @@ ORDER BY M.SERVCODE
     }
   }
 
+async saveServiceCost(req: Request, res: Response) {
+  const data = req.body;
+
+  try {
+    // ✅ DELETE first
+    await executeDbQuery(`
+      DELETE FROM MST_SERVICECOST
+      WHERE SERVCODE = @SERVCODE
+        AND TARIFFID = @TARIFFID
+        AND REVISIONID = @REVISIONID
+        AND CLNORGCODE = @CLNORGCODE
+    `, {
+      SERVCODE: data.SERVCODE,
+      TARIFFID: data.TARIFFID,
+      REVISIONID: data.REVISIONID,
+      CLNORGCODE: data.CLNORGCODE
+    });
+
+    // ✅ INSERT
+    for (const row of data.rateRows) {
+      await executeDbQuery(`
+        INSERT INTO MST_SERVICECOST (
+          SERVCODE, BEDCATGCODE, SERVICECOST,
+          DOCTSHAREAMT, REVISIONID, TARIFFID, CLNORGCODE,PKGCOST
+        )
+        VALUES (
+          @SERVCODE, @BEDCATGCODE, @SERVICECOST,
+          @DOCTSHAREAMT, @REVISIONID, @TARIFFID, @CLNORGCODE, @PKGCOST
+        )
+      `, {
+        SERVCODE: data.SERVCODE,
+        BEDCATGCODE: row.BEDCATGCODE,
+        SERVICECOST: row.SERVICECOST,
+        DOCTSHAREAMT: row.DOCTSHAREAMT,
+        REVISIONID: data.REVISIONID,
+        TARIFFID: data.TARIFFID,
+    
+        CLNORGCODE: data.CLNORGCODE,
+         PKGCOST: row.PKGCOST ?? 0
+      });
+    }
+
+    res.json({ status: 0, message: "Saved successfully" });
+
+  } catch (err: any) {
+    res.status(500).json({ status: 1, message: err.message });
+  }
+}
   async getNextServiceCode(req: Request, res: Response) {
     try {
       // Get the last service code ordered descending
@@ -168,7 +237,7 @@ ORDER BY M.SERVCODE
           @QTY_EDITABLE,
           @ISDAYCARE,
           @ONLINEBOOK_YN,
-          '001001001000'
+          @CLNORGCODE
         )
       `;
 
@@ -194,7 +263,8 @@ ORDER BY M.SERVCODE
         ISTESTEXTCNTR: data.ISTESTEXTCNTR === 'Y' ? 'Y' : 'N',
         QTY_EDITABLE: data.QTY_EDITABLE === 'Y' ? 'Y' : 'N',
         ISDAYCARE: data.ISDAYCARE === 'Y' ? 'Y' : 'N',
-        ONLINEBOOK_YN: data.ONLINEBOOK_YN
+        ONLINEBOOK_YN: data.ONLINEBOOK_YN,
+         CLNORGCODE: data.CLNORGCODE
       });
 
       res.json({ status: 0, message: 'Service inserted successfully' });
