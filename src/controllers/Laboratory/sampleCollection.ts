@@ -153,8 +153,7 @@ export default class sampleCollectionController {
       WHERE om.ORDERDATE BETWEEN @fromDate AND @toDate
       AND om.STATUS = 'A'
       AND om.ORDER_STATUS <> 'OR'
-      AND om.CLNORGCODE LIKE @hospitalId + '%'
-    `;
+      AND (@hospitalId = '' OR om.CLNORGCODE = @hospitalId)    `;
 
       // Sample Status
       if (
@@ -192,26 +191,36 @@ export default class sampleCollectionController {
 
       // Section
       if (params.section) {
-        conditions += ` AND ot.LABDPTCODE LIKE @section + '%'`;
+        conditions += ` AND (@section = '' OR LTRIM(RTRIM(ot.LABDPTCODE)) = LTRIM(RTRIM(@section)))`;
       }
 
       // ================= OP QUERY =================
       const opQuery = `
-      ${baseQuery}
-      ${params.companyId ? "INNER JOIN OPD_BILLMST OB ON OB.BILLNO = OM.BILLNO" : ""}
-      ${conditions}
-      AND om.ORDERTYPE = 'O'
-      ${params.companyId ? "AND OB.CRDCOMPCD LIKE @companyId + '%'" : ""}
-    `;
+       ${baseQuery}
+       LEFT JOIN OPD_BILLMST OB ON OB.BILLNO = OM.BILLNO
+       ${conditions}
+AND (
+  @companyId LIKE '' 
+  OR (
+    OB.CRDCOMPCD IS NOT NULL 
+    AND OB.CRDCOMPCD <> '' 
+    AND OB.CRDCOMPCD LIKE @companyId + '%'
+  )
+)`;
 
       // ================= IP QUERY =================
       const ipQuery = `
       ${baseQuery}
-      ${params.companyId ? "INNER JOIN IPD_ADMISSION IA ON IA.IPNO = OM.IPNO" : ""}
+      LEFT JOIN IPD_ADMISSION IA ON IA.IPNO = OM.IPNO
       ${conditions}
-      AND om.ORDERTYPE = 'I'
-      ${params.companyId ? "AND IA.CRDCOMPCD LIKE @companyId + '%'" : ""}
-    `;
+AND (
+  @companyId LIKE '' 
+  OR (
+    IA.CRDCOMPCD IS NOT NULL 
+    AND IA.CRDCOMPCD <> '' 
+    AND IA.CRDCOMPCD LIKE @companyId + '%'
+  )
+)`;
 
       // ================= FINAL =================
       const finalQuery = `
