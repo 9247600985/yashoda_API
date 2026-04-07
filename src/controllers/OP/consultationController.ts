@@ -1233,7 +1233,7 @@ export default class consultationController {
 
       if (records?.length) {
         const { MRNO } = records[0];
-        res.status(200).json({ status: 0, MRNO: MRNO, OPNO: input.OPDNum });
+        res.status(200).json({ status: 0, MRNO: MRNO, OPNum: input.OPDNum });
       } else {
         res.status(200).json({ status: 1, message: "No data returned from SP" });
 
@@ -2100,7 +2100,7 @@ export default class consultationController {
     try {
       const query = `EXEC USP_GET_PATIENT_DETAILS @HospitalId = @HospitalId, @PATTYPE = @PATTYPE, @MRNO =  @MRNO, @DOCTCODE = @DOCTCODE, @IPNO = @IPNO, @OPDREGNO = @OPDREGNO`;
 
-      const params = { HospitalId: input.hospid, PATTYPE: input.pattypesearch, MRNO: input.mrno, DOCTCODE: input.doctcd, IPNO: input.ipno, OPDREGNO: input.mrno };
+      const params = { HospitalId: input.hospid, PATTYPE: input.pattypesearch, MRNO: input.mrno, DOCTCODE: input.doctcd, IPNO: input.ipno, OPDREGNO: input.patOPNum };
 
       const result = await executeDbQuery(query, params);
       const records = result.records || [];
@@ -2141,7 +2141,7 @@ export default class consultationController {
         MRNO: input.mrno,
         DOCTCODE: input.doctcd,
         IPNO: input.ipno,
-        OPDREGNO: input.patOPNum || input.mrno,
+        OPDREGNO: input.patOPNum
       };
 
       const query = "USP_GET_PATIENT_DETAILS";

@@ -11,18 +11,15 @@ export default class sampleCollectionController {
     this.router.get("/orders", authenticateToken, this.getOrders.bind(this));
     // this.router.get("/tests", authenticateToken, this.getTests.bind(this));
     // this.router.get("/order-details", authenticateToken, this.getOrderDetails.bind(this));
-    this.router.get(
-      "/departments",
-      authenticateToken,
-      this.getLabDepartments.bind(this),
-    );
-    this.router.get(
-      "/companies",
-      authenticateToken,
-      this.getCompanies.bind(this),
-    );
+    this.router.get("/departments", authenticateToken, this.getLabDepartments.bind(this),);
+    this.router.get("/companies", authenticateToken,this.getCompanies.bind(this),);
+    this.router.get("/getSpecimenDropdown", authenticateToken, this.getSpecimenDropdown.bind(this),);
+    this.router.get("/getContainerDropdown", authenticateToken, this.getContainerDropdown.bind(this),);
     // this.router.post("/update-status", authenticateToken, this.changeStatus.bind(this));
     // this.router.post("/submit-sample", authenticateToken, this.submitSample.bind(this));
+    this.router.post("/submit-sample-collection", authenticateToken, this.submitSampleCollection.bind(this));
+    this.router.get("/getCollectedByDropdown", authenticateToken, this.getCollectedByDropdown.bind(this));
+    this.router.get("/getExternalVendorsDropdown", authenticateToken, this.getExternalVendorsDropdown.bind(this));
   }
 
   private convertDateFormat(dateStr: string): string {
@@ -89,7 +86,7 @@ export default class sampleCollectionController {
     FROM DGL_ORDERTRN ot
     INNER JOIN DGL_TESTMASTER tm ON ot.TESTCODE = tm.TESTCODE
     INNER JOIN DGL_LABDEPT ld ON tm.LABDPTCODE = ld.LABDPTCODE
-    LEFT JOIN DGL_SPECIMENMAST sm ON tm.SPECCODE = sm.SPECCODE
+    LEFT JOIN DGL_SPECIMENMAST sm ON tm.SPECCODE = sm.SPECCODE 
     LEFT JOIN DGL_CONTAINERMAST cm ON tm.CONTCODE = cm.CONTCODE
     WHERE ot.ORDERNO = @orderNo
     ORDER BY ot.SEQNO
@@ -244,6 +241,121 @@ AND (
     }
   }
 
+
+  // controller/dropdownController.js
+async getSpecimenDropdown(_req: Request, res: Response) {
+  try {
+    const query = `
+      SELECT 
+        SPECCODE AS SPECIMENID, 
+        SPECDESC AS SPECIMENNAME 
+      FROM DGL_SPECIMENMAST 
+      WHERE STATUS = 'A' 
+      ORDER BY SPECDESC
+    `;
+
+    const { records } = await executeDbQuery(query);
+
+    res.json({
+      status: 0,
+      data: records
+    });
+
+  } catch (err: any) {
+    res.status(500).json({
+      status: 1,
+      message: err.message
+    });
+  }
+}
+
+async getContainerDropdown(_req: Request, res: Response) {
+  try {
+    const query = `
+      SELECT 
+        CONTCODE AS CONTAINERID, 
+        CONTNAME AS CONTAINERNAME 
+      FROM DGL_CONTAINERMAST 
+      WHERE STATUS = @status 
+      ORDER BY CONTNAME
+    `;
+
+    const { records } = await executeDbQuery(query, { status: 'A' });
+
+    res.json({
+      status: 0,
+      data: records
+    });
+
+  } catch (err: any) {
+    res.status(500).json({
+      status: 1,
+      message: err.message
+    });
+  }
+}
+
+async getCollectedByDropdown(req: Request, res: Response) {
+  try {
+    const { hospitalId } = req.query as any;
+
+    const query = `
+      SELECT 
+        USERID AS USERID,
+        USERNAME AS USERNAME
+      FROM Mst_UserDetails
+      WHERE ROLES = @role
+        AND (@hospitalId = '' OR CLNORGCODE = @hospitalId)
+      ORDER BY USERNAME
+    `;
+
+    const { records } = await executeDbQuery(query, {
+      role: '004',
+      hospitalId: hospitalId || '',
+    });
+
+    res.json({
+      status: 0,
+      data: records
+    });
+
+  } catch (err: any) {
+    res.status(500).json({
+      status: 1,
+      message: err.message
+    });
+  }
+}
+
+async getExternalVendorsDropdown(req: Request, res: Response) {
+  try {
+    const { hospitalId } = req.query as any;
+
+    const query = `
+      SELECT 
+        EXTVNDRCODE AS VENDORID,
+        EXTVNDRNAME AS VENDORNAME
+      FROM DGL_EXTVENDORMST
+      WHERE (@hospitalId = '' OR CLNORGCODE = @hospitalId)
+      ORDER BY EXTVNDRNAME
+    `;
+
+    const { records } = await executeDbQuery(query, {
+      hospitalId: hospitalId || ''
+    });
+
+    res.json({
+      status: 0,
+      data: records
+    });
+
+  } catch (err: any) {
+    res.status(500).json({
+      status: 1,
+      message: err.message
+    });
+  }
+}
   // async getTests(req: Request, res: Response) {
   //   try {
   //     const { section, hospitalId, orderNo } = req.query as any;
@@ -353,4 +465,43 @@ AND (
   //     res.status(500).json({ status: 1, message: err.message });
   //   }
   // }
+
+  async submitSampleCollection(req: Request, res: Response) {
+    const { selectedTests, collectionInfo } = req.body;
+    const transaction = new sql.Transaction(conpool);
+
+    try {
+      await transaction.begin();
+
+      for (const test of selectedTests) {
+        // Update sample collection details
+        await executeDbQuery(
+          `UPDATE DGL_ORDERTRN SET 
+            SAMPLESTATUS = 'SC',
+            TESTSTATUS = 'SC',
+            SAMLECOLNO = @sampleNo,
+            SAMLECOLBY = @collectedBy,
+            SAMCOLDATE = @collectedDate,
+            SAMCOLTIME = @collectedTime
+           WHERE ORDERNO = @orderNo AND TESTCODE = @testCode
+           AND CLNORGCODE = @hospitalId`,
+          {
+            sampleNo: collectionInfo.labCode || '',
+            collectedBy: collectionInfo.collectedBy || '',
+            collectedDate: collectionInfo.collectedDate ? new Date(collectionInfo.collectedDate) : new Date(),
+            collectedTime: collectionInfo.collectedTime || '',
+            orderNo: test.ORDERNO,
+            testCode: test.TESTCODE,
+          },
+          { transaction }
+        );
+      }
+
+      await transaction.commit();
+      res.json({ status: 0, message: "Sample collection saved successfully" });
+    } catch (err: any) {
+      await transaction.rollback();
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
 }
