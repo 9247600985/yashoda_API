@@ -64,9 +64,197 @@ export default class consultationController {
     this.router.post("/getRegFee1", authenticateToken, this.getRegFee1.bind(this));
     this.router.post("/savePatientDetailsWithIPAddress", authenticateToken, this.savePatientDetailsWithIPAddress.bind(this));
     this.router.post("/saveIPADDRESS_OPDBILLMST", authenticateToken, this.saveIPADDRESS_OPDBILLMST.bind(this));
+    this.router.get("/getSalutations", authenticateToken, this.getSalutations.bind(this));
+    this.router.get("/loadDisCategory", authenticateToken, this.loadDisCategory.bind(this));
+    this.router.get("/loadDiscAuth", authenticateToken, this.loadDiscAuth.bind(this));
+    this.router.get("/loadCreditAuth", authenticateToken, this.loadCreditAuth.bind(this));
+this.router.get("/loadCompanies", authenticateToken, this.loadCompanies.bind(this));
+this.router.get("/loadpatcategories", authenticateToken, this.loadpatcategories.bind(this));
+this.router.get("/loadpay_mode", authenticateToken, this.loadpay_mode.bind(this));
+    this.router.get("/loadVisits", authenticateToken, this.loadVisits.bind(this));
+this.router.get("/loadDoctors", authenticateToken, this.loadDoctors.bind(this));
+this.router.get("/loadnationality", authenticateToken, this.loadnationality.bind(this));
+this.router.get("/loadRefAgents", authenticateToken, this.loadRefAgents.bind(this));
+this.router.get("/loadcities", authenticateToken, this.loadcities.bind(this));
+this.router.get("/loadStates", authenticateToken, this.loadStates.bind(this));
+this.router.get("/loadDistricts", authenticateToken, this.loadDistricts.bind(this));
+
+this.router.get("/loadpatcategories", authenticateToken, this.loadpatcategories.bind(this));
+this.router.get("/loadRefDoctor", authenticateToken, this.loadRefDoctor.bind(this));
+this.router.get("/loadDepartment", authenticateToken, this.loadDepartment.bind(this));
 
   }
+async getSalutations(req: Request, res: Response): Promise<void> {
+    const sql = `select Sal_Code,Sal_Desc,Status from Mst_Salutation order by Sal_Desc`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
 
+
+  async loadDisCategory(req: Request, res: Response): Promise<void> {
+    const sql = `select DC_Code,DC_Name,Status from MST_DiscountCategory order by DC_Name`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadDiscAuth(req: Request, res: Response): Promise<void> {
+    const sql = `select AUTHCD,AUTHNAME,Status from MST_AUTHORIZATION order by AUTHNAME`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadCreditAuth(req: Request, res: Response): Promise<void> {
+    const sql = `select AUTHCD,AUTHNAME,Status from MST_AUTHORIZATION order by AUTHNAME`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadCompanies(req: Request, res: Response): Promise<void> {
+    const sql = `select Com_Id,name,Status from Company order by name`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+   async loadpatcategories(req: Request, res: Response): Promise<void> {
+    const sql = `select PC_Code,PC_Name,Status from Mst_PatientCategory order by PC_Name`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadpay_mode(req: Request, res: Response): Promise<void> {
+    const sql = `select Paymodeid,PayMode,Status from PayMode order by PayMode`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadVisits(req: Request, res: Response): Promise<void> {
+    const sql = `select VisitType_ID,VisitType_Name,Status from VisitType_Master order by VisitType_Name`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadDoctors(req: Request, res: Response): Promise<void> {
+    const sql = `select Code,Firstname,Status from mst_doctormaster order by Firstname`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+   async loadDepartment(req: Request, res: Response): Promise<void> {
+    const sql = `select DEPTCODE,DEPTNAME,Status from Mst_Department order by DEPTNAME`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadnationality(req: Request, res: Response): Promise<void> {
+    const sql = `select NATLCODE,NATLDESC,Status from MST_NATIONALITY order by NATLDESC`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadRefAgents(req: Request, res: Response): Promise<void> {
+    const sql = `select Ref_ID,Ref_FName,Status from Mst_ReferralAgents order by Ref_FName`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadRefDoctor(req: Request, res: Response): Promise<void> {
+    const sql = `select RefDoct_ID,RefDoctor_FName,Status from Mst_ReferralDoctor order by RefDoctor_FName`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadcities(req: Request, res: Response): Promise<void> {
+    const sql = `select ID,CityName,Status from Mst_City_Details order by CityName`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadStates(req: Request, res: Response): Promise<void> {
+    const sql = `select State_ID,State_Name,Status from mst_state order by State_Name`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+async loadDistricts(req: Request, res: Response): Promise<void> {
+    const sql = `select District_ID,District_Name,Status from Mst_District order by District_Name`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+async getDepartmentByDoctor(req: Request, res: Response): Promise<void> {
+  try {
+    const doctcode = req.body.doctcode;
+
+    const query = `
+      SELECT d.DEPTCODE, d.department
+      FROM Mst_Doctor m
+      INNER JOIN Mst_Department d ON m.DEPTCODE = d.DEPTCODE
+      WHERE m.DOCTCODE = @DOCTCODE
+    `;
+
+    const params = {
+      DOCTCODE: doctcode
+    };
+
+    const result = await executeDbQuery(query, params);
+
+    res.json({
+      status: 0,
+      result: result.records || []
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 1, message: err.message });
+  }
+}
   async getCurrentVisitType(req: Request, res: Response): Promise<void> {
     // Small helpers
     const toInt = (v: any, def = 0) =>
@@ -817,7 +1005,7 @@ export default class consultationController {
 
   async getTokenNo(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
-    const sql = `SELECT GENTOKEN FROM OPD_DOCTTOKENNO WHERE DOCTCODE=@DOCTCD AND CLNORGCODE=@HOSPID AND CONVERT(VARCHAR(10),CONSDATE,120)=CONVERT(VARCHAR(10),GETDATE(),120) `;
+    const sql = `SELECT GENTOKEN FROM OPD_DOCTTOKENNO WHERE DOCTCODE=@DOCTCODE AND CLNORGCODE=@HOSPID AND CONVERT(VARCHAR(10),CONSDATE,120)=CONVERT(VARCHAR(10),GETDATE(),120) `;
 
     const params = { DOCTCODE: input.DOCTCODE, HOSPID: input.HospitalId }
     try {
@@ -2074,11 +2262,9 @@ export default class consultationController {
   }
 
   async getPatientList(req: Request, res: Response): Promise<void> {
-    const input: PatSearchCriteria = req.body.pat || {};
+  const input: PatSearchCriteria = req.body.pat || {};
 
-
-    // HTML table start
-    let table = `
+  let table = `
     <thead>
       <tr class='success'>
         <th style='text-align: left;'>MR Number</th>
@@ -2097,38 +2283,64 @@ export default class consultationController {
     <tbody>
   `;
 
-    try {
-      const query = `EXEC USP_GET_PATIENT_DETAILS @HospitalId = @HospitalId, @PATTYPE = @PATTYPE, @MRNO =  @MRNO, @DOCTCODE = @DOCTCODE, @IPNO = @IPNO, @OPDREGNO = @OPDREGNO`;
+  try {
+    const query = `EXEC USP_GET_PATIENT_DETAILS @HospitalId = @HospitalId, @PATTYPE = @PATTYPE, @MRNO = @MRNO, @DOCTCODE = @DOCTCODE, @IPNO = @IPNO, @OPDREGNO = @OPDREGNO`;
 
-      const params = { HospitalId: input.hospid, PATTYPE: input.pattypesearch, MRNO: input.mrno, DOCTCODE: input.doctcd, IPNO: input.ipno, OPDREGNO: input.patOPNum };
+    const params = {
+      HospitalId: input.hospid,
+      PATTYPE: input.pattypesearch,
+      MRNO: input.mrno,
+      DOCTCODE: input.doctcd,
+      IPNO: input.ipno,
+      OPDREGNO: input.patOPNum
+    };
 
-      const result = await executeDbQuery(query, params);
-      const records = result.records || [];
-      for (const dr of records) {
-        table += `
+    const result = await executeDbQuery(query, params);
+    const records = result.records || [];
+
+    const patientList = records.map((dr: any) => ({
+      PatientMr_No: dr["PatientMr_No"] || "",
+      patMrnoDOM: input.patMrnoDOM || "",
+      IPNO: dr["IPNO"] || "",
+      patIpnoDOM: input.patIpnoDOM || "",
+      Patient_Name: dr["Patient_Name"] || "",
+      Gender: dr["Gender"] || "",
+      Age: dr["Age"] || "",
+      Patient_DOB: dr["Patient_DOB"] ? formatDateChange(dr["Patient_DOB"]) : "",
+      Mobile: dr["Mobile"] || "",
+      Address1: dr["Address1"] || "",
+      fathername: dr["fathername"] || ""
+    }));
+
+    for (const row of patientList) {
+      table += `
         <tr>
-          <td style='text-align: left;'>${dr["PatientMr_No"] || ""}</td>
-          <td style='text-align: left; display:none'>${input.patMrnoDOM || ""}</td>
-          <td style='text-align: left;'>${dr["IPNO"] || ""}</td>
-          <td style='text-align: left; display:none'>${input.patIpnoDOM || ""}</td>
-          <td style='text-align: left;'>${dr["Patient_Name"] || ""}</td>
-          <td style='text-align: left;'>${dr["Gender"] || ""}</td>
-          <td style='text-align: left;'>${dr["Age"] || ""}</td>
-          <td style='text-align: left;'>${dr["Patient_DOB"] ? formatDateChange(dr["Patient_DOB"]) : ""}</td>
-          <td style='text-align: left;'>${dr["Mobile"] || ""}</td>
-          <td style='text-align: left;'>${dr["Address1"] || ""}</td>
-          <td style='text-align: left;'>${dr["fathername"] || ""}</td>
+          <td style='text-align: left;'>${row.PatientMr_No}</td>
+          <td style='text-align: left; display:none'>${row.patMrnoDOM}</td>
+          <td style='text-align: left;'>${row.IPNO}</td>
+          <td style='text-align: left; display:none'>${row.patIpnoDOM}</td>
+          <td style='text-align: left;'>${row.Patient_Name}</td>
+          <td style='text-align: left;'>${row.Gender}</td>
+          <td style='text-align: left;'>${row.Age}</td>
+          <td style='text-align: left;'>${row.Patient_DOB}</td>
+          <td style='text-align: left;'>${row.Mobile}</td>
+          <td style='text-align: left;'>${row.Address1}</td>
+          <td style='text-align: left;'>${row.fathername}</td>
         </tr>
       `;
-      }
-
-      table += "</tbody>";
-
-      res.json({ status: 0, d: table });
-    } catch (err: any) {
-      res.status(500).json({ status: 1, message: err.message });
     }
+
+    table += `</tbody>`;
+
+    res.json({
+      status: 0,
+      d: table,
+      result: patientList
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 1, message: err.message });
   }
+}
 
   async setPatientDetails(req: Request, res: Response): Promise<void> {
     const input: PatSearchCriteria = req.body.pat || {};
