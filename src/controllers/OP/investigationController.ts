@@ -146,6 +146,12 @@ export default class investigationController {
       authenticateToken,
       this.DisplayPrintOutpatientBillPagedispaly1.bind(this),
     );
+
+    this.router.get(
+      "/investigationLoadDoctors",
+      authenticateToken,
+      this.loadDoctors.bind(this),
+    );
     this.router.post(
       "/saveInvestigation",
       authenticateToken,
@@ -160,6 +166,11 @@ export default class investigationController {
       "/CancelDetails",
       authenticateToken,
       this.CancelDetails.bind(this),
+    );
+    this.router.get(
+      "/loadTariffCategories",
+      authenticateToken,
+      this.loadTariffCategories.bind(this),
     );
   }
 
@@ -1652,6 +1663,38 @@ export default class investigationController {
       });
 
       res.json({ status: 0, d: details });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async loadDoctors(req: Request, res: Response): Promise<void> {
+    const sql = `
+    SELECT Code, Firstname, Status
+    FROM Mst_DoctorMaster
+    WHERE Status = 'A'
+    ORDER BY Firstname
+  `;
+
+    try {
+      const { records } = await executeDbQuery(sql, []);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async loadTariffCategories(req: Request, res: Response): Promise<void> {
+    const sql = `
+    SELECT TARIFFID, TARIFFDESC
+    FROM MST_TARIFFCATGORY
+    WHERE STATUS = 'A'
+    ORDER BY TARIFFDESC
+  `;
+
+    try {
+      const { records } = await executeDbQuery(sql, []);
+      res.json({ status: 0, d: records });
     } catch (err: any) {
       res.status(500).json({ status: 1, result: err.message });
     }
