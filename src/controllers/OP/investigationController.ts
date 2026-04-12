@@ -30,6 +30,11 @@ export default class investigationController {
       this.getServicesInfo.bind(this),
     );
     this.router.get(
+      "/getServicesInfoJson",
+      authenticateToken,
+      this.getServicesInfoJson.bind(this),
+    );
+    this.router.get(
       "/getPaymentType",
       authenticateToken,
       this.getPaymentType.bind(this),
@@ -250,6 +255,55 @@ export default class investigationController {
       if (i > 0) table += "</tbody>";
 
       res.json({ status: 0, d: table });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async getServicesInfoJson(req: Request, res: Response): Promise<void> {
+    const input = req.method === 'GET' ? req.query : req.body;
+    const SERVCODE     = input.serviceCode   || '';
+    const CLNORGCODE   = input.hospid        || '';
+    const TARIFFID     = input.tariffId      || '';
+    const BEDCATGCODE  = input.bedCategoryId || '';
+    const patientType  = input.patientType   || 'OP';
+
+    let query = '';
+    const base = `SELECT d.DEPTNAME, M.SERVCODE, M.SERVNAME, MS.SERVICECOST, MS.DOCTSHAREAMT,
+        M.DOC_COMP, M.RATEEDIT, M.DEPTCODE, M.NAMEEDIT, M.QTY_EDITABLE,
+        M.IsDiscountAlwd, M.MaxDiscountPer, M.SERVTYPECD, M.SRVGRPCODE, M.SRVSUBGRP
+        FROM MST_SERVICES M
+        JOIN MST_SERVICECOST MS ON MS.SERVCODE = M.SERVCODE AND MS.STATUS = 'A'
+        JOIN Mst_Department d ON d.DEPTCODE = M.DEPTCODE
+        WHERE M.STATUS = 'A'
+        AND (M.SERVCODE LIKE '%${SERVCODE}%' OR M.SERVNAME LIKE '%${SERVCODE}%' OR M.MNEUNONIC LIKE '%${SERVCODE}%')`;
+
+    if (patientType === 'IP') {
+      query = base + ` AND MS.TARIFFID='${TARIFFID}' AND MS.BEDCATGCODE='${BEDCATGCODE}' AND MS.CLNORGCODE='${CLNORGCODE}' ORDER BY M.SERVNAME`;
+    } else {
+      query = base + ` AND MS.TARIFFID='001' AND MS.BEDCATGCODE IN (SELECT OpBedCatId FROM Mst_FacilitySetup) AND MS.CLNORGCODE='${CLNORGCODE}' ORDER BY M.SERVNAME`;
+    }
+
+    try {
+      const result = await executeDbQuery(query, []);
+      const data = (result.records || []).map((r: any) => ({
+        SERVCODE:       r.SERVCODE        || '',
+        SERVNAME:       r.SERVNAME        || '',
+        RATE:           r.SERVICECOST     || 0,
+        DOCTSHAREAMT:   r.DOCTSHAREAMT    || 0,
+        DOC_COMP:       r.DOC_COMP        || '',
+        RATEEDIT:       r.RATEEDIT        || '',
+        NAMEEDIT:       r.NAMEEDIT        || '',
+        QTY_EDITABLE:   r.QTY_EDITABLE    || '',
+        IsDiscountAlwd: r.IsDiscountAlwd  || '',
+        MaxDiscountPer: r.MaxDiscountPer  || 0,
+        SERVTYPECD:     r.SERVTYPECD      || '',
+        SRVGRPCODE:     r.SRVGRPCODE      || '',
+        SRVSUBGRP:      r.SRVSUBGRP       || '',
+        DEPTCODE:       r.DEPTCODE        || '',
+        DEPTNAME:       r.DEPTNAME        || '',
+      }));
+      res.json({ status: 0, d: data });
     } catch (err: any) {
       res.status(500).json({ status: 1, result: err.message });
     }
@@ -1442,6 +1496,7 @@ export default class investigationController {
         status: r.status ?? "",
         USERNAME: r.USERNAME ?? "",
         Firstname: r.Firstname ?? "",
+        OPDREGNO: r.OPDREGNO ?? "",
       }));
 
       res.json({ status: 0, d: data });
