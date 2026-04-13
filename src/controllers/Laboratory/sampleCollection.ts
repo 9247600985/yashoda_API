@@ -16,8 +16,7 @@ export default class sampleCollectionController {
     this.router.get("/getSpecimenDropdown", authenticateToken, this.getSpecimenDropdown.bind(this),);
     this.router.get("/getContainerDropdown", authenticateToken, this.getContainerDropdown.bind(this),);
     // this.router.post("/update-status", authenticateToken, this.changeStatus.bind(this));
-    // this.router.post("/submit-sample", authenticateToken, this.submitSample.bind(this));
-    this.router.post("/submit-sample-collection", authenticateToken, this.submitSampleCollection.bind(this));
+    this.router.post("/submitSample", authenticateToken, this.submitSample.bind(this));
     this.router.get("/getCollectedByDropdown", authenticateToken, this.getCollectedByDropdown.bind(this));
     this.router.get("/getExternalVendorsDropdown", authenticateToken, this.getExternalVendorsDropdown.bind(this));
   }
@@ -435,73 +434,62 @@ async getExternalVendorsDropdown(req: Request, res: Response) {
   //   }
   // }
 
-  // async submitSample(req: Request, res: Response) {
-  //   const { sampleDetailsList, hospitalId } = req.body;
-  //   const transaction = new sql.Transaction(conpool);
+async submitSample(req: Request, res: Response) {
+  const { selectedTests, collectionInfo } = req.body;
 
-  //   try {
-  //     await transaction.begin();
-
-  //     for (const row of sampleDetailsList) {
-  //       await executeDbQuery(
-  //         `UPDATE DGL_ORDERTRN SET SAMPLESTATUS='SA', TESTSTATUS='SA', SAMLECOLNO=@sampleNo,
-  //          SAMLECOLBY=@collectedBy, SAMCOLDATE=GETDATE(), SAMCOLTIME=CONVERT(VARCHAR(8), GETDATE(), 108)
-  //          WHERE ORDERNO=@orderNo AND TESTCODE=@testCode AND CLNORGCODE=@hospitalId`,
-  //         {
-  //           sampleNo: row.sampleNo,
-  //           collectedBy: row.collectedBy,
-  //           orderNo: row.orderNo,
-  //           testCode: row.testCode,
-  //           hospitalId: hospitalId || "1",
-  //         },
-  //         { transaction }
-  //       );
-  //     }
-
-  //     await transaction.commit();
-  //     res.json({ status: 0, message: "Saved successfully" });
-  //   } catch (err: any) {
-  //     await transaction.rollback();
-  //     res.status(500).json({ status: 1, message: err.message });
-  //   }
-  // }
-
-  async submitSampleCollection(req: Request, res: Response) {
-    const { selectedTests, collectionInfo } = req.body;
-    const transaction = new sql.Transaction(conpool);
-
-    try {
-      await transaction.begin();
-
-      for (const test of selectedTests) {
-        // Update sample collection details
-        await executeDbQuery(
-          `UPDATE DGL_ORDERTRN SET 
-            SAMPLESTATUS = 'SC',
-            TESTSTATUS = 'SC',
-            SAMLECOLNO = @sampleNo,
-            SAMLECOLBY = @collectedBy,
-            SAMCOLDATE = @collectedDate,
-            SAMCOLTIME = @collectedTime
-           WHERE ORDERNO = @orderNo AND TESTCODE = @testCode
-           AND CLNORGCODE = @hospitalId`,
-          {
-            sampleNo: collectionInfo.labCode || '',
-            collectedBy: collectionInfo.collectedBy || '',
-            collectedDate: collectionInfo.collectedDate ? new Date(collectionInfo.collectedDate) : new Date(),
-            collectedTime: collectionInfo.collectedTime || '',
-            orderNo: test.ORDERNO,
-            testCode: test.TESTCODE,
-          },
-          { transaction }
-        );
-      }
-
-      await transaction.commit();
-      res.json({ status: 0, message: "Sample collection saved successfully" });
-    } catch (err: any) {
-      await transaction.rollback();
-      res.status(500).json({ status: 1, message: err.message });
-    }
+  if (!selectedTests || selectedTests.length === 0) {
+    return res.status(400).json({ message: "No tests selected" });
   }
+  const user = (req as any).user;
+  const transaction = new sql.Transaction(conpool);
+  
+
+  try {
+    await transaction.begin();
+
+    for (const test of selectedTests) {
+      const result = await executeDbQuery(
+        `UPDATE DGL_ORDERTRN SET 
+          SAMPLESTATUS = 'SC',
+          TESTSTATUS = 'SC',
+          SAMLECOLNO = @sampleNo,
+          SAMLECOLBY = @collectedBy,
+          SAMCOLDATE = @collectedDate,
+          SAMCOLTIME = @collectedTime,
+          UPDATEDBY = @userId,
+          UPDATEDON = GETDATE()
+         WHERE ORDERNO = @orderNo 
+           AND TESTCODE = @testCode
+           AND CLNORGCODE = @hospitalId`,
+        {
+          sampleNo: collectionInfo.labCode || '',
+          collectedBy: collectionInfo.collectedBy,
+          collectedDate: collectionInfo.collectedDate ? new Date(collectionInfo.collectedDate) : new Date(),
+          collectedTime: collectionInfo.collectedTime || new Date().toTimeString().split(' ')[0],
+          orderNo: test.ORDERNO,
+          testCode: test.TESTCODE,
+          hospitalId: collectionInfo.hospitalId || "1",
+          userId: user?.id || collectionInfo.collectedBy
+        },
+        { transaction }
+      );
+
+      if (result.rowsAffected[0] === 0) {
+        throw new Error(`No rows updated for ${test.ORDERNO}`);
+      }
+    }
+
+    await transaction.commit();
+
+    res.json({
+      status: 0,
+      message: "Sample collection saved successfully",
+      count: selectedTests.length
+    });
+
+  } catch (err: any) {
+    await transaction.rollback();
+    res.status(500).json({ status: 1, message: err.message });
+  }
+}
 }
