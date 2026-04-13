@@ -9,15 +9,23 @@ const commonOptions = {
   trustServerCertificate: true,
 };
 
+// export const config: sql.config = {
+//   user: "sa",
+//   password: isLocal ? "prosoft@123" : "PROSOFT@123",
+//   server: isLocal ? "DESKTOP-2O02DD6" : "183.82.146.20",
+//   port: isLocal ? 1433 : 1466,
+//   database: "YASHODA_01042026",
+//   options: commonOptions,
+// };
 export const config: sql.config = {
-  user: "sa",
-  password: isLocal ? "prosoft@123" : "PROSOFT@123",
-  server: isLocal ? "DESKTOP-2O02DD6" : "183.82.146.20",
-  port: isLocal ? 1433 : 1466,
-  database: "YASHODA_220825",
-  options: commonOptions,
-};
 
+  user:"sa",
+  password:"PROSOFT@123",
+  server:"183.82.146.20",
+  port:1466,
+  database:"YASHODA_01042026",
+options: commonOptions,
+}
 export const conpool = new sql.ConnectionPool(config);
 
 export const poolReady = conpool.connect().then(() => logInfo("SQL pool ready")).catch(err => logError(`SQL pool connect error: ${err.message || err}`));

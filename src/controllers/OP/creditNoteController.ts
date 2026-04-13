@@ -22,6 +22,8 @@ export default class creditNoteController {
         this.router.get("/getPreviousCNAmountByBill", authenticateToken, this.getPreviousCNAmountByBill.bind(this));
         this.router.post("/saveCreditNote", authenticateToken, this.saveCreditNote.bind(this));
         this.router.post("/saveIPAddress_OPDBILLMST_CN", authenticateToken, this.saveIPAddress_OPDBILLMST.bind(this));
+        this.router.get("/getAuthorizedBy", authenticateToken, this.getAuthorizedBy.bind(this));
+this.router.get("/getDiscountCategory", authenticateToken, this.getDiscountCategory.bind(this));
 
     }
 
@@ -251,7 +253,7 @@ export default class creditNoteController {
             let html = `
       <caption>Category Wise Patient</caption>
       <thead>
-        <tr class='success'>
+        <tr class='TABLE-PRIMARY'>
           <th style='text-align:left;'>Credit Note No.</th>
           <th style='text-align:left;'>Bill No.</th>
           <th style='text-align:left;'>Bill Date</th>
@@ -294,7 +296,8 @@ export default class creditNoteController {
           <td></td><td></td><td></td><td></td><td></td>
           <td style='text-align:left;'>Total</td>
           <td style='text-align:right;'>(${totCnAmt.toFixed(2)})</td>
-          <td></td><td></td><td></td>
+          <td></td><td></td><td>
+          </td>
         </tr>
       </tfoot>
     `;
@@ -549,5 +552,48 @@ export default class creditNoteController {
             });
         }
     }
+
+    //for drop downs
+    async getAuthorizedBy(req: Request, res: Response): Promise<void> {
+    try {
+        const sqlQuery = `
+            SELECT AUTHCD, AUTHNAME 
+            FROM MST_AUTHORIZATION 
+            
+        `;
+
+        const { records } = await executeDbQuery(sqlQuery, {});
+
+        const list = records.map((r: any) => ({
+            code: r.AUTHCD,
+            label: r.AUTHNAME
+        }));
+
+        res.json({ status: 0, d: list });
+
+    } catch (err: any) {
+        res.status(500).json({ status: 1, result: err.message });
+    }
+}
+async getDiscountCategory(req: Request, res: Response): Promise<void> {
+    try {
+        const sqlQuery = `
+            SELECT DC_CODE, DC_NAME 
+            FROM MST_DiscountCategory
+        `;
+
+        const { records } = await executeDbQuery(sqlQuery, {});
+
+        const list = records.map((r: any) => ({
+            code: r.DC_CODE,
+            label: r.DC_NAME
+        }));
+
+        res.json({ status: 0, d: list });
+
+    } catch (err: any) {
+        res.status(500).json({ status: 1, result: err.message });
+    }
+}
 
 }

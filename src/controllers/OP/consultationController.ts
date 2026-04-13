@@ -2,9 +2,26 @@ import express, { Request, Response, Router } from "express";
 import os from "os";
 import { conpool, executeDbQuery } from "../../db";
 import sql from "mssql";
-import { VisitType, VisitTypeResponse, safeVal, PatSearchCriteria, PatientSearchObj, formatDate, safeNumber, RegistrationFee, numberToWords, CompanyNoticeBoardRegistration, formatDateChange, PatDetailsFromAppointment, formatDateForDb, toDate, fmtDateYYYYMMDD, toInt } from "../../utilities/helpers";
+import {
+  VisitType,
+  VisitTypeResponse,
+  safeVal,
+  PatSearchCriteria,
+  PatientSearchObj,
+  formatDate,
+  safeNumber,
+  RegistrationFee,
+  numberToWords,
+  CompanyNoticeBoardRegistration,
+  formatDateChange,
+  PatDetailsFromAppointment,
+  formatDateForDb,
+  toDate,
+  fmtDateYYYYMMDD,
+  toInt,
+} from "../../utilities/helpers";
 import { authenticateToken } from "../../utilities/authMiddleWare";
-const moment = require('moment');
+const moment = require("moment");
 
 export default class consultationController {
   private router: Router = express.Router();
@@ -12,68 +29,593 @@ export default class consultationController {
   constructor(private app: Router) {
     app.use("/op", authenticateToken, this.router);
 
-    this.router.get("/Duplicate", authenticateToken, this.Check_Duplicate.bind(this));
-    this.router.get("/DuplicateDoctorPatcon", authenticateToken, this.Check_DuplicateDoctorPatcon.bind(this));
-    this.router.get("/DuplicateDoctorPatcon1", authenticateToken, this.Check_DuplicateDoctorPatcon1.bind(this));
-    this.router.get("/BindPrintvaliddays", authenticateToken, this.BindPrintvaliddays.bind(this));
-    this.router.get("/GetPaymentType1", authenticateToken, this.GetPaymentType1.bind(this));
-    this.router.get("/getFessOnDoctorCode", authenticateToken, this.getFessOnDoctorCode.bind(this));
+    this.router.get(
+      "/Duplicate",
+      authenticateToken,
+      this.Check_Duplicate.bind(this),
+    );
+    this.router.get(
+      "/DuplicateDoctorPatcon",
+      authenticateToken,
+      this.Check_DuplicateDoctorPatcon.bind(this),
+    );
+    this.router.get(
+      "/DuplicateDoctorPatcon1",
+      authenticateToken,
+      this.Check_DuplicateDoctorPatcon1.bind(this),
+    );
+    this.router.get(
+      "/BindPrintvaliddays",
+      authenticateToken,
+      this.BindPrintvaliddays.bind(this),
+    );
+    this.router.get(
+      "/GetPaymentType1",
+      authenticateToken,
+      this.GetPaymentType1.bind(this),
+    );
+    this.router.get(
+      "/getFessOnDoctorCode",
+      authenticateToken,
+      this.getFessOnDoctorCode.bind(this),
+    );
     this.router.get("/checkIpNo", authenticateToken, this.checkIpNo.bind(this));
-    this.router.get("/GetDoctCode", authenticateToken, this.GetDoctCode.bind(this));
-    this.router.get("/GetCONSBYDEPT", authenticateToken, this.GetCONSBYDEPT.bind(this));
-    this.router.get("/getDoctorDepartment", authenticateToken, this.getDoctorDepartment.bind(this));
-    this.router.get("/getTokenNo", authenticateToken, this.getTokenNo.bind(this));
-    this.router.get("/Get_Footer", authenticateToken, this.Get_Footer.bind(this));
-    this.router.get("/checkMRStatus", authenticateToken, this.checkMRStatus.bind(this));
-    this.router.get("/getClinic_Details", authenticateToken, this.getClinic_Details.bind(this));
-    this.router.get("/getDoctorQualification", authenticateToken, this.getDoctorQualification.bind(this));
-    this.router.get("/getFacilityDefaultValues", authenticateToken, this.getFacilityDefaultValues.bind(this));
-    this.router.get("/displaydate", authenticateToken, this.displaydate.bind(this));
-    this.router.get("/getPatientOtherDetails", authenticateToken, this.getPatientOtherDetails.bind(this));
-    this.router.get("/GetPaymentType", authenticateToken, this.GetPaymentType.bind(this));
-    this.router.get("/loadOPRefDocRefAgent", authenticateToken, this.loadOPRefDocRefAgent.bind(this));
-    this.router.get("/GetPATTYPE", authenticateToken, this.GetPATTYPE.bind(this));
-    this.router.get("/getSecondaryDoctors", authenticateToken, this.getSecondaryDoctors.bind(this));
-    this.router.get("/getPatCategoryDetails", authenticateToken, this.getPatCategoryDetails.bind(this));
-    this.router.get("/ServeicePageconsult", authenticateToken, this.ServeicePageconsult.bind(this));
-    this.router.get("/bindPrintConsultationPage2", authenticateToken, this.bindPrintConsultationPage2.bind(this));
-    this.router.get("/getAppointmentList", authenticateToken, this.getAppointmentList.bind(this));
-    this.router.get("/getPatientDetailsFromAppointment", authenticateToken, this.getPatientDetailsFromAppointment.bind(this));
-    this.router.get("/getConsultationlist", authenticateToken, this.getConsultationlist.bind(this));
-    this.router.get("/getConsultationBillDetails", authenticateToken, this.getConsultationBillDetails.bind(this));
-    this.router.get("/getLocalIPAddress", authenticateToken, this.getLocalIPAddress.bind(this));
-    this.router.get("/getPublicIP", authenticateToken, this.getPublicIP.bind(this));
-    this.router.get("/viewVisits", authenticateToken, this.viewVisits.bind(this));
-    this.router.get("/GetPatOldData", authenticateToken, this.GetPatOldData.bind(this));
-    this.router.put("/DOCTPATCON", authenticateToken, this.updateDOCTPATCON.bind(this));
-    this.router.put("/DOCTPATCON1", authenticateToken, this.updateDOCTPATCON1.bind(this));
-    this.router.put("/PatientMaster", authenticateToken, this.updatePatientMaster.bind(this));
-    this.router.put("/cancelConsultation", authenticateToken, this.cancelConsultation.bind(this));
-    this.router.put("/cancelConsultation1", authenticateToken, this.cancelConsultation1.bind(this));
-    this.router.put("/UpdateConsultation", authenticateToken, this.UpdateConsultation.bind(this));
-    this.router.put("/UpdateConsultation1", authenticateToken, this.UpdateConsultation1.bind(this));
-    this.router.put("/UpDatePaidCOnsDate", authenticateToken, this.UpDatePaidCOnsDate.bind(this));
-    this.router.post("/PatientMaster", authenticateToken, this.savePatientMaster.bind(this));
-    this.router.post("/Consultation", authenticateToken, this.saveConsultation.bind(this));
-    this.router.post("/BillInsert", authenticateToken, this.generateBillInsert.bind(this));
-    this.router.post("/saveDOCTPATCON", authenticateToken, this.saveDOCTPATCON.bind(this));
-    this.router.post("/getCurrentVisitType", authenticateToken, this.getCurrentVisitType.bind(this));
-    this.router.post("/getCurrentVisitType1", authenticateToken, this.getCurrentVisitType1.bind(this));
-    this.router.post("/getPatientList", authenticateToken, this.getPatientList.bind(this));
-    this.router.post("/setPatientDetails", authenticateToken, this.setPatientDetails.bind(this));
-    this.router.post("/getRegFee1", authenticateToken, this.getRegFee1.bind(this));
-    this.router.post("/savePatientDetailsWithIPAddress", authenticateToken, this.savePatientDetailsWithIPAddress.bind(this));
-    this.router.post("/saveIPADDRESS_OPDBILLMST", authenticateToken, this.saveIPADDRESS_OPDBILLMST.bind(this));
-
+    this.router.get(
+      "/GetDoctCode",
+      authenticateToken,
+      this.GetDoctCode.bind(this),
+    );
+    this.router.get(
+      "/GetCONSBYDEPT",
+      authenticateToken,
+      this.GetCONSBYDEPT.bind(this),
+    );
+    this.router.get(
+      "/getDoctorDepartment",
+      authenticateToken,
+      this.getDoctorDepartment.bind(this),
+    );
+    this.router.get(
+      "/getTokenNo",
+      authenticateToken,
+      this.getTokenNo.bind(this),
+    );
+    this.router.get(
+      "/Get_Footer",
+      authenticateToken,
+      this.Get_Footer.bind(this),
+    );
+    this.router.get(
+      "/checkMRStatus",
+      authenticateToken,
+      this.checkMRStatus.bind(this),
+    );
+    this.router.get(
+      "/getClinic_Details",
+      authenticateToken,
+      this.getClinic_Details.bind(this),
+    );
+    this.router.get(
+      "/getDoctorQualification",
+      authenticateToken,
+      this.getDoctorQualification.bind(this),
+    );
+    this.router.get(
+      "/getFacilityDefaultValues",
+      authenticateToken,
+      this.getFacilityDefaultValues.bind(this),
+    );
+    this.router.get(
+      "/displaydate",
+      authenticateToken,
+      this.displaydate.bind(this),
+    );
+    this.router.get(
+      "/getPatientOtherDetails",
+      authenticateToken,
+      this.getPatientOtherDetails.bind(this),
+    );
+    this.router.get(
+      "/GetPaymentType",
+      authenticateToken,
+      this.GetPaymentType.bind(this),
+    );
+    this.router.get(
+      "/loadOPRefDocRefAgent",
+      authenticateToken,
+      this.loadOPRefDocRefAgent.bind(this),
+    );
+    this.router.get(
+      "/GetPATTYPE",
+      authenticateToken,
+      this.GetPATTYPE.bind(this),
+    );
+    this.router.get(
+      "/getSecondaryDoctors",
+      authenticateToken,
+      this.getSecondaryDoctors.bind(this),
+    );
+    this.router.get(
+      "/getPatCategoryDetails",
+      authenticateToken,
+      this.getPatCategoryDetails.bind(this),
+    );
+    this.router.get(
+      "/ServeicePageconsult",
+      authenticateToken,
+      this.ServeicePageconsult.bind(this),
+    );
+    this.router.get(
+      "/bindPrintConsultationPage2",
+      authenticateToken,
+      this.bindPrintConsultationPage2.bind(this),
+    );
+    this.router.get(
+      "/getAppointmentList",
+      authenticateToken,
+      this.getAppointmentList.bind(this),
+    );
+    this.router.get(
+      "/getPatientDetailsFromAppointment",
+      authenticateToken,
+      this.getPatientDetailsFromAppointment.bind(this),
+    );
+    this.router.get(
+      "/getConsultationlist",
+      authenticateToken,
+      this.getConsultationlist.bind(this),
+    );
+    this.router.get(
+      "/getConsultationBillDetails",
+      authenticateToken,
+      this.getConsultationBillDetails.bind(this),
+    );
+    this.router.get(
+      "/getLocalIPAddress",
+      authenticateToken,
+      this.getLocalIPAddress.bind(this),
+    );
+    this.router.get(
+      "/getPublicIP",
+      authenticateToken,
+      this.getPublicIP.bind(this),
+    );
+    this.router.get(
+      "/viewVisits",
+      authenticateToken,
+      this.viewVisits.bind(this),
+    );
+    this.router.get(
+      "/GetPatOldData",
+      authenticateToken,
+      this.GetPatOldData.bind(this),
+    );
+    this.router.put(
+      "/DOCTPATCON",
+      authenticateToken,
+      this.updateDOCTPATCON.bind(this),
+    );
+    this.router.put(
+      "/DOCTPATCON1",
+      authenticateToken,
+      this.updateDOCTPATCON1.bind(this),
+    );
+    this.router.put(
+      "/PatientMaster",
+      authenticateToken,
+      this.updatePatientMaster.bind(this),
+    );
+    this.router.put(
+      "/cancelConsultation",
+      authenticateToken,
+      this.cancelConsultation.bind(this),
+    );
+    this.router.put(
+      "/cancelConsultation1",
+      authenticateToken,
+      this.cancelConsultation1.bind(this),
+    );
+    this.router.put(
+      "/UpdateConsultation",
+      authenticateToken,
+      this.UpdateConsultation.bind(this),
+    );
+    this.router.put(
+      "/UpdateConsultation1",
+      authenticateToken,
+      this.UpdateConsultation1.bind(this),
+    );
+    this.router.put(
+      "/UpDatePaidCOnsDate",
+      authenticateToken,
+      this.UpDatePaidCOnsDate.bind(this),
+    );
+    this.router.post(
+      "/PatientMaster",
+      authenticateToken,
+      this.savePatientMaster.bind(this),
+    );
+    this.router.post(
+      "/Consultation",
+      authenticateToken,
+      this.saveConsultation.bind(this),
+    );
+    this.router.post(
+      "/BillInsert",
+      authenticateToken,
+      this.generateBillInsert.bind(this),
+    );
+    this.router.post(
+      "/saveDOCTPATCON",
+      authenticateToken,
+      this.saveDOCTPATCON.bind(this),
+    );
+    this.router.post(
+      "/getCurrentVisitType",
+      authenticateToken,
+      this.getCurrentVisitType.bind(this),
+    );
+    this.router.post(
+      "/getCurrentVisitType1",
+      authenticateToken,
+      this.getCurrentVisitType1.bind(this),
+    );
+    this.router.post(
+      "/getPatientList",
+      authenticateToken,
+      this.getPatientList.bind(this),
+    );
+    this.router.post(
+      "/setPatientDetails",
+      authenticateToken,
+      this.setPatientDetails.bind(this),
+    );
+    this.router.post(
+      "/getRegFee1",
+      authenticateToken,
+      this.getRegFee1.bind(this),
+    );
+    this.router.post(
+      "/savePatientDetailsWithIPAddress",
+      authenticateToken,
+      this.savePatientDetailsWithIPAddress.bind(this),
+    );
+    this.router.post(
+      "/saveIPADDRESS_OPDBILLMST",
+      authenticateToken,
+      this.saveIPADDRESS_OPDBILLMST.bind(this),
+    );
+    this.router.get(
+      "/getSalutations",
+      authenticateToken,
+      this.getSalutations.bind(this),
+    );
+    this.router.get(
+      "/loadDisCategory",
+      authenticateToken,
+      this.loadDisCategory.bind(this),
+    );
+    this.router.get(
+      "/loadDiscAuth",
+      authenticateToken,
+      this.loadDiscAuth.bind(this),
+    );
+    this.router.get(
+      "/loadCreditAuth",
+      authenticateToken,
+      this.loadCreditAuth.bind(this),
+    );
+    this.router.get(
+      "/loadCompanies",
+      authenticateToken,
+      this.loadCompanies.bind(this),
+    );
+    this.router.get(
+      "/loadpatcategories",
+      authenticateToken,
+      this.loadpatcategories.bind(this),
+    );
+    this.router.get(
+      "/loadpay_mode",
+      authenticateToken,
+      this.loadpay_mode.bind(this),
+    );
+    this.router.get(
+      "/loadVisits",
+      authenticateToken,
+      this.loadVisits.bind(this),
+    );
+    this.router.get(
+      "/loadDoctorsByRefHospital",
+      authenticateToken,
+      this.loadDoctorsByRefHospital.bind(this),
+    );
+    this.router.get(
+      "/loadnationality",
+      authenticateToken,
+      this.loadnationality.bind(this),
+    );
+    this.router.get(
+      "/loadRefAgents",
+      authenticateToken,
+      this.loadRefAgents.bind(this),
+    );
+    this.router.get(
+      "/loadcities",
+      authenticateToken,
+      this.loadcities.bind(this),
+    );
+    this.router.get(
+      "/loadStates",
+      authenticateToken,
+      this.loadStates.bind(this),
+    );
+    this.router.get(
+      "/loadDistricts",
+      authenticateToken,
+      this.loadDistricts.bind(this),
+    );
+    this.router.get(
+      "/loadpatcategories",
+      authenticateToken,
+      this.loadpatcategories.bind(this),
+    );
+    this.router.get(
+      "/loadRefDoctor",
+      authenticateToken,
+      this.loadRefDoctor.bind(this),
+    );
+    this.router.get(
+      "/loadDepartment",
+      authenticateToken,
+      this.loadDepartment.bind(this),
+    );
+     this.router.get(
+      "/loadDoctorsForConsultation",
+      authenticateToken,
+      this.loadDoctorsForConsultation.bind(this),
+    );
+    
+  }
+  async getSalutations(req: Request, res: Response): Promise<void> {
+    const sql = `select Sal_Code,Sal_Desc,Status from Mst_Salutation WHERE Status='A' order by Sal_Desc`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
   }
 
+  async loadDisCategory(req: Request, res: Response): Promise<void> {
+    const sql = `select DC_Code,DC_Name,Status from MST_DiscountCategory WHERE Status='A' order by DC_Name`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadDiscAuth(req: Request, res: Response): Promise<void> {
+    const sql = `select AUTHCD,AUTHNAME,Status from MST_AUTHORIZATION WHERE Status='A' order by AUTHNAME`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadCreditAuth(req: Request, res: Response): Promise<void> {
+    const sql = `select AUTHCD,AUTHNAME,Status from MST_AUTHORIZATION WHERE Status='A' order by AUTHNAME`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadCompanies(req: Request, res: Response): Promise<void> {
+    const sql = `select Com_Id,name,Status from Company WHERE Status='A' order by name`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadpatcategories(req: Request, res: Response): Promise<void> {
+    const sql = `select PC_Code,PC_Name,Status from Mst_PatientCategory WHERE Status='A' order by PC_Name`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadpay_mode(req: Request, res: Response): Promise<void> {
+    const sql = `select Paymodeid,PayMode,Status from PayMode  WHERE Status='A' order by PayMode`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadVisits(req: Request, res: Response): Promise<void> {
+    const sql = `select VisitType_ID,VisitType_Name,Status from VisitType_Master WHERE Status='A' order by VisitType_Name`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  // async loadDoctors(req: Request, res: Response): Promise<void> {
+  //   const sql = `select Code,Firstname,Status from mst_doctormaster WHERE Status='A' order by Firstname`;
+  //   try {
+  //     const { records } = await executeDbQuery(sql);
+  //     res.json({ status: 0, d: records });
+  //   } catch (err: any) {
+  //     res.status(500).json({ status: 1, result: err.message });
+  //   }
+  // }
+  async loadDoctorsByRefHospital(req: Request, res: Response): Promise<void> {
+  try {
+    const query = `
+      SELECT Code, Firstname
+      FROM Mst_DoctorMaster
+      WHERE status = 'A'
+        AND REF_HOSPID = @RefHospTypeId
+      ORDER BY Firstname
+    `;
+
+    const params = {
+      RefHospTypeId: req.query.RefHospTypeId,
+    };
+
+    const result = await executeDbQuery(query, params);
+
+    res.json({
+      status: 0,
+      result: result.records || [],
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      status: 1,
+      message: err.message,
+    });
+  }
+}
+async loadDoctorsForConsultation(req: Request, res: Response): Promise<void> {
+  try {
+    const query = `
+      SELECT 
+          M.Code,
+          M.Firstname
+      FROM Mst_DoctorMaster M
+      INNER JOIN MST_CHARGESHEET_TM DC
+          ON DC.DOCTOR_ID = M.Code
+          AND DC.CLNORGCODE = @HospitalId
+      WHERE 
+          M.status = 'A'
+          AND DC.NewVisit_Charge > 0
+      ORDER BY M.Firstname
+    `;
+
+    const params = {
+      HospitalId: req.query.HospitalId,
+    };
+
+    const result = await executeDbQuery(query, params);
+
+    res.json({
+      status: 0,
+      result: result.records || [],
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      status: 1,
+      message: err.message,
+    });
+  }
+}
+  async loadDepartment(req: Request, res: Response): Promise<void> {
+    const sql = `select DEPTCODE,DEPTNAME,Status from Mst_Department WHERE Status='A' order by DEPTNAME`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadnationality(req: Request, res: Response): Promise<void> {
+    const sql = `select NATLCODE,NATLDESC,Status from MST_NATIONALITY WHERE Status='A' order by NATLDESC`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadRefAgents(req: Request, res: Response): Promise<void> {
+    const sql = `select Ref_ID,Ref_FName,Status from Mst_ReferralAgents WHERE Status='A' order by Ref_FName`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadRefDoctor(req: Request, res: Response): Promise<void> {
+    const sql = `select RefDoct_ID,RefDoctor_FName,Status from Mst_ReferralDoctor WHERE Status='A' order by RefDoctor_FName`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadcities(req: Request, res: Response): Promise<void> {
+    const sql = `select ID,CityName,Status from Mst_City_Details WHERE Status='A' order by CityName`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadStates(req: Request, res: Response): Promise<void> {
+    const sql = `select State_ID,State_Name,Status from mst_state WHERE Status='A' order by State_Name`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async loadDistricts(req: Request, res: Response): Promise<void> {
+    const sql = `select District_ID,District_Name,Status from Mst_District WHERE Status='A' order by District_Name`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  async getDepartmentByDoctor(req: Request, res: Response): Promise<void> {
+    try {
+      const doctcode = req.body.doctcode;
+
+      const query = `
+      SELECT d.DEPTCODE, d.department
+      FROM Mst_Doctor m
+      INNER JOIN Mst_Department d ON m.DEPTCODE = d.DEPTCODE
+      WHERE m.DOCTCODE = @DOCTCODE
+    `;
+
+      const params = {
+        DOCTCODE: doctcode,
+      };
+
+      const result = await executeDbQuery(query, params);
+
+      res.json({
+        status: 0,
+        result: result.records || [],
+      });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
   async getCurrentVisitType(req: Request, res: Response): Promise<void> {
     // Small helpers
     const toInt = (v: any, def = 0) =>
       v === null || v === undefined || v === "" ? def : parseInt(v, 10);
 
     const formatYmd = (d?: Date | null) =>
-      d instanceof Date && !isNaN(d.getTime()) ? d.toISOString().substring(0, 10) : "";
+      d instanceof Date && !isNaN(d.getTime())
+        ? d.toISOString().substring(0, 10)
+        : "";
     // Expecting body fields similar to your C# VisitType class:
     // { viewmode, TariffCode, HospitalId, DEPTCODE, mrno, consultationno, doctcode, IPFollowUp_Days }
     const vt = req.body || {};
@@ -82,7 +624,6 @@ export default class consultationController {
     const mainQuery =
       vt.viewmode === "false"
         ? ` select DP.VisitType,DP.CLNORGCODE,DP.DOCTCODE,DP.MEDRECNO,DP.VisitType DPVisitType,DP.VISITS,DP.FreeVisit, DP.PaidVisit ,MC.Valid_Days,DP.LASTVISITDATE,MC.FreeFollowUp_No,MC.PaidFollowUp_No,DP.PAIDCONSDATE,DP.EDITED_ON,dp.IPFollowUp_Visits,MC.IP_FollowUp_Visits,MC.IP_FollowUp_Days from OPD_DOCTPATCON DP ,Mst_ChargeSheet_TM MC WHERE DP.DOCTCODE = MC.Doctor_ID AND MC.TARIFFID=@TARIFFCODE AND MC.CLNORGCODE =@HospitalId AND DP.CLNORGCODE=@CLNORGCODE AND DP.MEDRECNO=@mrno AND  DP.DOCTCODE=@doctcode `
-
         : ` select CN.VISITTYPE,DP.CLNORGCODE,DP.DOCTCODE,DP.MEDRECNO,DP.VisitType DPVisitType,DP.VISITS,DP.FreeVisit, DP.PaidVisit ,MC.Valid_Days,DP.LASTVISITDATE,MC.FreeFollowUp_No,MC.PaidFollowUp_No,DP.PAIDCONSDATE,DP.EDITED_ON ,dp.IPFollowUp_Visits,MC.IP_FollowUp_Visits,MC.IP_FollowUp_Days from OPD_CONSULTATION CN LEFT  JOIN OPD_DOCTPATCON DP ON CN.DOCTCODE = DP.DOCTCODE LEFT  JOIN Mst_ChargeSheet_TM MC  ON DP.DOCTCODE = MC.Doctor_ID WHERE MC.TARIFFID=@TARIFFCODE AND MC.CLNORGCODE = @HospitalId AND DP.CLNORGCODE=@CLNORGCODE AND DP.MEDRECNO=@mrno AND  DP.DOCTCODE=@doctcode AND CN.OPDBILLNO=@consultationno `;
 
     // Other query texts (1: latest IP discharge date window, 2: follow-up counters block, 3: latest cons dates)
@@ -116,8 +657,9 @@ export default class consultationController {
         IP_VISITDAYS: toInt(vt.IPFollowUp_Days, 0),
       };
       const disRes = await executeDbQuery(qLatestDisDate, disParams);
-      const Dis_Date: string =
-        disRes.records?.[0]?.DISDATE ? formatYmd(new Date(disRes.records[0].DISDATE)) : "";
+      const Dis_Date: string = disRes.records?.[0]?.DISDATE
+        ? formatYmd(new Date(disRes.records[0].DISDATE))
+        : "";
 
       // 2) MAIN query
       const mainRes = await executeDbQuery(mainQuery, mainParams);
@@ -150,7 +692,6 @@ export default class consultationController {
 
         // Return early like C# would (it returns list with one item)
         res.json({ d: results });
-
       }
 
       // 3) Rows exist — iterate like C#
@@ -161,8 +702,12 @@ export default class consultationController {
         const PaidVisit = toInt(row.PaidVisit, 0);
         const FreeFollowUp_No = toInt(row.FreeFollowUp_No, 0);
         const PaidFollowUp_No = toInt(row.PaidFollowUp_No, 0);
-        const LASTVISITDATE = row.LASTVISITDATE ? new Date(row.LASTVISITDATE) : null;
-        const PAIDCONSDATE = row.PAIDCONSDATE ? new Date(row.PAIDCONSDATE) : new Date("1900-01-01");
+        const LASTVISITDATE = row.LASTVISITDATE
+          ? new Date(row.LASTVISITDATE)
+          : null;
+        const PAIDCONSDATE = row.PAIDCONSDATE
+          ? new Date(row.PAIDCONSDATE)
+          : new Date("1900-01-01");
         const EDITED_ON = row.EDITED_ON ? new Date(row.EDITED_ON) : null;
 
         const IP_FollowUp_Days = toInt(row.IP_FollowUp_Days, 0);
@@ -204,19 +749,25 @@ export default class consultationController {
               });
             } else {
               // Need latest dept PAIDCONSDATE and latest RECEIPTDATE for new visits
-              const paidConsRes = await executeDbQuery(qLatestPaidConsDateForDept, {
-                DEPTCODE: vt.DEPTCODE,
-                mrno: vt.mrno,
-              });
+              const paidConsRes = await executeDbQuery(
+                qLatestPaidConsDateForDept,
+                {
+                  DEPTCODE: vt.DEPTCODE,
+                  mrno: vt.mrno,
+                },
+              );
               const consDate =
                 paidConsRes.records?.[0]?.PAIDCONSDATE &&
                 new Date(paidConsRes.records[0].PAIDCONSDATE);
               CHKPAIDCONSDATE = consDate ? formatYmd(consDate) : "";
 
-              const latestNewVisitRes = await executeDbQuery(qLatestReceiptDateForNewVisit, {
-                DEPTCODE: vt.DEPTCODE,
-                mrno: vt.mrno,
-              });
+              const latestNewVisitRes = await executeDbQuery(
+                qLatestReceiptDateForNewVisit,
+                {
+                  DEPTCODE: vt.DEPTCODE,
+                  mrno: vt.mrno,
+                },
+              );
               const latestRcpt =
                 latestNewVisitRes.records?.[0]?.RECEIPTDATE &&
                 new Date(latestNewVisitRes.records[0].RECEIPTDATE);
@@ -240,7 +791,11 @@ export default class consultationController {
               const withinValid = nowYmd < new Date(CHECKDATE);
 
               if (Freefollowupcount < FreeFollowUp_No) {
-                visittype = withinValid ? "2" : paidfollowupcount < PaidFollowUp_No && withinValid ? "3" : "1";
+                visittype = withinValid
+                  ? "2"
+                  : paidfollowupcount < PaidFollowUp_No && withinValid
+                    ? "3"
+                    : "1";
               } else if (paidfollowupcount < PaidFollowUp_No) {
                 visittype = withinValid ? "3" : "1";
               } else {
@@ -274,10 +829,13 @@ export default class consultationController {
             new Date(paidConsRes.records[0].PAIDCONSDATE);
           CHKPAIDCONSDATE = consDate ? formatYmd(consDate) : "";
 
-          const latestNewVisitRes = await executeDbQuery(qLatestReceiptDateForNewVisit, {
-            DEPTCODE: vt.DEPTCODE,
-            mrno: vt.mrno,
-          });
+          const latestNewVisitRes = await executeDbQuery(
+            qLatestReceiptDateForNewVisit,
+            {
+              DEPTCODE: vt.DEPTCODE,
+              mrno: vt.mrno,
+            },
+          );
           const latestRcpt =
             latestNewVisitRes.records?.[0]?.RECEIPTDATE &&
             new Date(latestNewVisitRes.records[0].RECEIPTDATE);
@@ -301,7 +859,11 @@ export default class consultationController {
           const withinValid = nowYmd < CHECKDATE;
 
           if (Freefollowupcount < FreeFollowUp_No) {
-            visittype = withinValid ? "2" : paidfollowupcount < PaidFollowUp_No && withinValid ? "3" : "1";
+            visittype = withinValid
+              ? "2"
+              : paidfollowupcount < PaidFollowUp_No && withinValid
+                ? "3"
+                : "1";
           } else if (paidfollowupcount < PaidFollowUp_No) {
             visittype = withinValid ? "3" : "1";
           } else {
@@ -348,11 +910,25 @@ export default class consultationController {
     try {
       const disQry = ` SELECT TOP 1 DISDATE FROM IPD_DISCHARGE WHERE IPNO IN ( SELECT IPNO FROM IPD_ADMISSION WHERE ADMNDOCTOR = @doctcode AND MEDRECNO = @mrno AND CONVERT(varchar(10), DISCHRGDT, 120) >= DATEADD(D, -1 * @IP_VISITDAYS, GETDATE()) ) `;
 
-      const disParams = { doctcode: input.doctcode, mrno: input.mrno, IP_VISITDAYS: toInt(input.IPFollowUp_Days, 0), };
+      const disParams = {
+        doctcode: input.doctcode,
+        mrno: input.mrno,
+        IP_VISITDAYS: toInt(input.IPFollowUp_Days, 0),
+      };
       const disRes = await executeDbQuery(disQry, disParams);
-      const Dis_Date: string = disRes.records?.[0]?.DISDATE ? String(disRes.records[0].DISDATE) : "";
+      const Dis_Date: string = disRes.records?.[0]?.DISDATE
+        ? String(disRes.records[0].DISDATE)
+        : "";
 
-      const mainParams = { TARIFFCODE: input.TariffCode, HospitalId: input.HospitalId, CLNORGCODE: input.HospitalId, mrno: input.mrno, doctcode: input.doctcode, DEPTCODE: input.DEPTCODE, consultationno: input.consultationno, };
+      const mainParams = {
+        TARIFFCODE: input.TariffCode,
+        HospitalId: input.HospitalId,
+        CLNORGCODE: input.HospitalId,
+        mrno: input.mrno,
+        doctcode: input.doctcode,
+        DEPTCODE: input.DEPTCODE,
+        consultationno: input.consultationno,
+      };
       const mainRes = await executeDbQuery(query, mainParams);
       const dt = mainRes.records || [];
 
@@ -391,9 +967,12 @@ export default class consultationController {
 
         if (Dis_Date !== "") {
           const IP_VISITDAYS = toInt(input.IPFollowUp_Days, 0);
-          const CHECKDATE = (PAIDCONSDATE && Number.isFinite(IP_VISITDAYS))
-            ? new Date(PAIDCONSDATE.getTime() + IP_VISITDAYS * 24 * 60 * 60 * 1000)
-            : null;
+          const CHECKDATE =
+            PAIDCONSDATE && Number.isFinite(IP_VISITDAYS)
+              ? new Date(
+                  PAIDCONSDATE.getTime() + IP_VISITDAYS * 24 * 60 * 60 * 1000,
+                )
+              : null;
 
           const ipCountQry = ` SELECT COUNT(*) AS CNT FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DOCTCODE = @doctcode AND CONVERT(varchar(10), RECEIPTDATE, 120) > DATEADD(D, -1 * @IP_VISITDAYS, GETDATE()) AND VISITTYPE = '4' AND STATUS != 'C' `;
           const ipCountParams = {
@@ -411,7 +990,6 @@ export default class consultationController {
             });
             continue;
           } else {
-
             const IPCHKDATE = CHKPAIDCONSDATE ?? "1900-01-01";
             if (IPCHKDATE === "1900-01-01") {
               visityTypes.push({
@@ -422,28 +1000,53 @@ export default class consultationController {
               });
               continue;
             } else {
-
               const nowDate = new Date();
-              const withinValidWindow = CHECKDATE ? (nowDate < CHECKDATE) : false;
-
+              const withinValidWindow = CHECKDATE ? nowDate < CHECKDATE : false;
 
               const latestConDateQry = ` SELECT TOP 1 RECEIPTDATE FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DEPTCODE = @DEPTCODE AND STATUS != 'c' AND VISITTYPE = '1' ORDER BY RECEIPTDATE DESC `;
-              const latestConParams = { mrno: input.mrno, DEPTCODE: input.DEPTCODE };
-              const latestRes = await executeDbQuery(latestConDateQry, latestConParams);
-              const latestConsDate = toDate(latestRes.records?.[0]?.RECEIPTDATE);
+              const latestConParams = {
+                mrno: input.mrno,
+                DEPTCODE: input.DEPTCODE,
+              };
+              const latestRes = await executeDbQuery(
+                latestConDateQry,
+                latestConParams,
+              );
+              const latestConsDate = toDate(
+                latestRes.records?.[0]?.RECEIPTDATE,
+              );
               const RCPTDATE = fmtDateYYYYMMDD(latestConsDate);
 
-
               const freeFollowCountQry = ` SELECT COUNT(*) AS CNT FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DEPTCODE = @DEPTCODE AND CONVERT(varchar(10), RECEIPTDATE, 120) >= @RCPTDATE AND VISITTYPE = '2' AND STATUS != 'C' `;
-              const freeFollowParams = { mrno: input.mrno, DEPTCODE: input.DEPTCODE, RCPTDATE };
-              const freeCountRes = await executeDbQuery(freeFollowCountQry, freeFollowParams);
-              const Freefollowupcount = toInt(freeCountRes.records?.[0]?.CNT, 0);
+              const freeFollowParams = {
+                mrno: input.mrno,
+                DEPTCODE: input.DEPTCODE,
+                RCPTDATE,
+              };
+              const freeCountRes = await executeDbQuery(
+                freeFollowCountQry,
+                freeFollowParams,
+              );
+              const Freefollowupcount = toInt(
+                freeCountRes.records?.[0]?.CNT,
+                0,
+              );
 
               // Count Paid Follow-ups (VISITTYPE='3') since RCPTDATE by DEPTCODE
               const paidFollowCountQry = ` SELECT COUNT(*) AS CNT FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DEPTCODE = @DEPTCODE AND CONVERT(varchar(10), RECEIPTDATE, 120) >= @RCPTDATE AND VISITTYPE = '3' AND STATUS != 'C' `;
-              const paidFollowParams = { mrno: input.mrno, DEPTCODE: input.DEPTCODE, RCPTDATE };
-              const paidCountRes = await executeDbQuery(paidFollowCountQry, paidFollowParams);
-              const paidfollowupcount = toInt(paidCountRes.records?.[0]?.CNT, 0);
+              const paidFollowParams = {
+                mrno: input.mrno,
+                DEPTCODE: input.DEPTCODE,
+                RCPTDATE,
+              };
+              const paidCountRes = await executeDbQuery(
+                paidFollowCountQry,
+                paidFollowParams,
+              );
+              const paidfollowupcount = toInt(
+                paidCountRes.records?.[0]?.CNT,
+                0,
+              );
 
               // Decision logic mirrors C#
               if (Freefollowupcount < freefolowup) {
@@ -461,7 +1064,6 @@ export default class consultationController {
                 visittype = "1";
               }
 
-
               if (isViewModeTrue) {
                 visittype = dr.VISITTYPE ? String(dr.VISITTYPE) : "1";
               }
@@ -476,35 +1078,54 @@ export default class consultationController {
             }
           }
         } else {
-
-          const CHECKDATE = (PAIDCONSDATE && Number.isFinite(validDays))
-            ? new Date(PAIDCONSDATE.getTime() + validDays * 24 * 60 * 60 * 1000)
-            : null;
+          const CHECKDATE =
+            PAIDCONSDATE && Number.isFinite(validDays)
+              ? new Date(
+                  PAIDCONSDATE.getTime() + validDays * 24 * 60 * 60 * 1000,
+                )
+              : null;
           CHKPAIDCONSDATE = fmtDateYYYYMMDD(PAIDCONSDATE);
           CHKRCPTDATE = fmtDateYYYYMMDD(RECEIPTDATE);
 
-
           const latestConDateQry = ` SELECT TOP 1 RECEIPTDATE FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DEPTCODE = @DEPTCODE AND STATUS != 'c' AND VISITTYPE = '1' ORDER BY RECEIPTDATE DESC `;
 
-          const latestConParams = { mrno: input.mrno, DEPTCODE: input.DEPTCODE };
-          const latestRes = await executeDbQuery(latestConDateQry, latestConParams);
+          const latestConParams = {
+            mrno: input.mrno,
+            DEPTCODE: input.DEPTCODE,
+          };
+          const latestRes = await executeDbQuery(
+            latestConDateQry,
+            latestConParams,
+          );
           const latestConsDate = toDate(latestRes.records?.[0]?.RECEIPTDATE);
           const RCPTDATE = fmtDateYYYYMMDD(latestConsDate);
 
-
           const freeFollowCountQry = ` SELECT COUNT(*) AS CNT FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DOCTCODE = @doctcode AND CONVERT(varchar(10), RECEIPTDATE, 120) >= @RCPTDATE AND VISITTYPE = '2' AND STATUS != 'C' `;
-          const freeFollowParams = { mrno: input.mrno, doctcode: input.doctcode, RCPTDATE };
-          const freeCountRes = await executeDbQuery(freeFollowCountQry, freeFollowParams);
+          const freeFollowParams = {
+            mrno: input.mrno,
+            doctcode: input.doctcode,
+            RCPTDATE,
+          };
+          const freeCountRes = await executeDbQuery(
+            freeFollowCountQry,
+            freeFollowParams,
+          );
           const Freefollowupcount = toInt(freeCountRes.records?.[0]?.CNT, 0);
 
-
           const paidFollowCountQry = ` SELECT COUNT(*) AS CNT FROM OPD_CONSULTATION WHERE MEDRECNO = @mrno AND DOCTCODE = @doctcode AND CONVERT(varchar(10), RECEIPTDATE, 120) >= @RCPTDATE AND VISITTYPE = '3' AND STATUS != 'C' `;
-          const paidFollowParams = { mrno: input.mrno, doctcode: input.doctcode, RCPTDATE };
-          const paidCountRes = await executeDbQuery(paidFollowCountQry, paidFollowParams);
+          const paidFollowParams = {
+            mrno: input.mrno,
+            doctcode: input.doctcode,
+            RCPTDATE,
+          };
+          const paidCountRes = await executeDbQuery(
+            paidFollowCountQry,
+            paidFollowParams,
+          );
           const paidfollowupcount = toInt(paidCountRes.records?.[0]?.CNT, 0);
 
           const nowDate = new Date();
-          const withinValidWindow = CHECKDATE ? (nowDate < CHECKDATE) : false;
+          const withinValidWindow = CHECKDATE ? nowDate < CHECKDATE : false;
 
           // Decision logic mirrors C#
           if (Freefollowupcount < freefolowup) {
@@ -522,7 +1143,6 @@ export default class consultationController {
             visittype = "1";
           }
 
-
           if (isViewModeTrue) {
             visittype = dr.VISITTYPE ? String(dr.VISITTYPE) : "1";
           }
@@ -536,7 +1156,6 @@ export default class consultationController {
           });
         }
       }
-
 
       res.json({ d: visityTypes });
     } catch (ex: any) {
@@ -562,7 +1181,11 @@ export default class consultationController {
         sql += ` AND Doctor_ID = @doctcode`;
       }
 
-      const params: any = { tariffcd: input.TARIFFID, HospitalId: input.CLNORGCODE, COUNTRY_ID: input.COUNTRY_ID, };
+      const params: any = {
+        tariffcd: input.TARIFFID,
+        HospitalId: input.CLNORGCODE,
+        COUNTRY_ID: input.COUNTRY_ID,
+      };
 
       if (input.DOCTCODE && input.DOCTCODE.length > 0) {
         params.doctcode = input.DOCTCODE;
@@ -620,7 +1243,7 @@ export default class consultationController {
           Religion: dr.RELGCODE || "",
           maritalstatus: dr.Marital_Status || "",
           bloodgroup: dr.Blood_Group || "",
-          PatientType: dr.PatientType || ""
+          PatientType: dr.PatientType || "",
         };
       });
 
@@ -635,7 +1258,7 @@ export default class consultationController {
 
     const sql = `Select pm.ReferralDoctoragent_ID,pm.ReferralDoctor_ID,Ref_FName,RefDoctor_FName from Patient_Master pm left join Mst_ReferralDoctor mrd on mrd.RefDoct_ID=pm.ReferralDoctor_ID left join Mst_ReferralAgents mra on mra.Ref_ID=pm.ReferralDoctoragent_ID where  (pm.PatientMr_No=@MRNO or pm.PatientMr_No=@OPNO)`;
 
-    const params = { MRNO: input.mrno, OPNO: input.OPNO }
+    const params = { MRNO: input.mrno, OPNO: input.OPNO };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -649,7 +1272,7 @@ export default class consultationController {
 
     const sql = `select Payment_Type,* from Mst_PatientCategory where PC_Code=@PATCATGCD`;
 
-    const params = { PATCATGCD: input.PatientCategory }
+    const params = { PATCATGCD: input.PatientCategory };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -663,7 +1286,7 @@ export default class consultationController {
 
     const sql = `SELECT count(*) as count FROM OPD_DOCTPATCON WHERE MEDRECNO=@MEDRECNO`;
 
-    const params = { MEDRECNO: input.MEDRECNO }
+    const params = { MEDRECNO: input.MEDRECNO };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -677,7 +1300,10 @@ export default class consultationController {
 
     const sql = `SELECT 1 SL_NO ,DOCT_CODE1, Firstname ,Qualification , Qualification1,Qualification2,Qualification3,Qualification4       FROM Primary_Secondary_doctors P ,  Mst_DoctorMaster D WHERE P.DOCT_CODE1 = D.CODE    AND P.CLINIC_CODE = @CLINIC_CODE  AND P.CONS_DOCT_CODE = @CONS_DOCT_CODE   UNION ALL SELECT 2 SL_NO ,DOCT_CODE2, Firstname ,Qualification , Qualification1,Qualification2,Qualification3,Qualification4     FROM  Primary_Secondary_doctors P, Mst_DoctorMaster D WHERE P.DOCT_CODE2 = D.CODE    AND P.CLINIC_CODE = @CLINIC_CODE  AND P.CONS_DOCT_CODE = @CONS_DOCT_CODE  UNION ALL SELECT 3 SL_NO ,DOCT_CODE3, Firstname ,Qualification , Qualification1,Qualification2,Qualification3,Qualification4     FROM  Primary_Secondary_doctors P, Mst_DoctorMaster D WHERE P.DOCT_CODE3 = D.CODE     AND P.CLINIC_CODE = @CLINIC_CODE  AND P.CONS_DOCT_CODE = @CONS_DOCT_CODE   UNION ALL SELECT 4 SL_NO ,DOCT_CODE4, Firstname ,Qualification , Qualification1,Qualification2,Qualification3,Qualification4     FROM  Primary_Secondary_doctors P, Mst_DoctorMaster D WHERE P.DOCT_CODE4 = D.CODE     AND P.CLINIC_CODE = @CLINIC_CODE  AND P.CONS_DOCT_CODE = @CONS_DOCT_CODE   UNION ALL SELECT 5 SL_NO ,DOCT_CODE5, Firstname ,Qualification , Qualification1,Qualification2,Qualification3,Qualification4     FROM  Primary_Secondary_doctors P, Mst_DoctorMaster D WHERE P.DOCT_CODE5 = D.CODE     AND P.CLINIC_CODE = @CLINIC_CODE  AND P.CONS_DOCT_CODE = @CONS_DOCT_CODE ORDER BY 1`;
 
-    const params = { CLINIC_CODE: input.CLINIC_CODE, CONS_DOCT_CODE: input.CONS_DOCT_CODE }
+    const params = {
+      CLINIC_CODE: input.CLINIC_CODE,
+      CONS_DOCT_CODE: input.CONS_DOCT_CODE,
+    };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -691,7 +1317,7 @@ export default class consultationController {
 
     const sql = `select t.CLNORGCODE,t.TARIFFID,t.TARIFFDESC,t.REC_STATUS,t.RevisionId ,p.Payment_Type from MST_TARIFFCATGORY t,Mst_PatientCategory p where t.TARIFFID=p.Tariff_Category and p.PC_Code=@PC_Code`;
 
-    const params = { PC_Code: input.PatCatCd }
+    const params = { PC_Code: input.PatCatCd };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -705,7 +1331,7 @@ export default class consultationController {
 
     const sql = `select opd.servcode,mst.servname,opd.quantity,opd.rate,opd.amount from opd_billtrn opd  inner join  mst_services mst on opd.servcode=mst.servcode  where billno=@billno order by mst.servname desc`;
 
-    const params = { billno: input.billno }
+    const params = { billno: input.billno };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, d: records });
@@ -719,7 +1345,7 @@ export default class consultationController {
 
     const sql = `select count(*) AS AdmittedCount from ipd_admission where status='A' and medrecno=@MRNO `;
 
-    const params = { MRNO: input.PatientMrNo }
+    const params = { MRNO: input.PatientMrNo };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -733,7 +1359,7 @@ export default class consultationController {
 
     const sql = ` select MST.CountryId,COALESCE(CN.Country_Name,'')Country_Name, MST.StateId,COALESCE(ST.State_Name,'') State_Name, MST.DistrictId,COALESCE(DS.District_Name ,'')District_Name, MST.CityId,MST.PC_CODE ,COALESCE(CT.CityName,'')CityName,OpBedCatId from Mst_FacilitySetup MST LEFT JOIN Mst_Country CN ON CN.Country_ID = MST.CountryId LEFT JOIN Mst_State ST ON ST.State_ID = MST.StateId LEFT JOIN Mst_District DS ON DS.District_ID=MST.DistrictId LEFT JOIN Mst_City_Details CT ON CT.ID=MST.CityId where MST.CLNORGCODE=@HOSPID`;
 
-    const params = { HOSPID: input.HospitalId }
+    const params = { HOSPID: input.HospitalId };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -745,7 +1371,7 @@ export default class consultationController {
   async displaydate(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
     const sql = `select PAIDCONSDATE FROM OPD_DOCTPATCON WHERE MEDRECNO=@MEDRECNO`;
-    const params = { MEDRECNO: input.MEDRECNO }
+    const params = { MEDRECNO: input.MEDRECNO };
     try {
       const { records } = await executeDbQuery(sql, params);
 
@@ -753,7 +1379,6 @@ export default class consultationController {
         let dateObj = "";
         if (row.PAIDCONSDATE) {
           dateObj = formatDate(row.PAIDCONSDATE);
-
         }
         return { PAIDCONSDATE: dateObj };
       });
@@ -767,7 +1392,7 @@ export default class consultationController {
   async GetDoctCode(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
     const sql = `SELECT DOCTCODE FROM OPD_CONSULTATION WHERE MEDRECNO=@MRNO AND OPDBILLNO=@BILLNO`;
-    const params = { MRNO: input.PatientMrNo, BILLNO: input.BILLNO }
+    const params = { MRNO: input.PatientMrNo, BILLNO: input.BILLNO };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -779,7 +1404,7 @@ export default class consultationController {
   async getDoctorDepartment(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
     const sql = `select DEP.CLNORGCODE, Dep.DEPTCODE,Dep.DEPTNAME,Doc.serviceCode,(select OPRegFeeServcode from Mst_FacilitySetup where CLNORGCODE=@HospitalId) OPRegFeeServcode, Doc.roomno from Mst_DoctorMaster Doc, Mst_Department Dep where Doc.Department = Dep.DEPTCODE and Doc.Code=@DOCTCODE `;
-    const params = { HospitalId: input.HospitalId, DOCTCODE: input.DOCTCODE }
+    const params = { HospitalId: input.HospitalId, DOCTCODE: input.DOCTCODE };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -792,7 +1417,7 @@ export default class consultationController {
     const input = req.method === "GET" ? req.query : req.body;
     const sql = `SELECT isnull(OP_PRESC_FOOTER,'')as OP_PRESC_FOOTER FROM TM_CLINICS WHERE CLINIC_CODE=@CLINIC_CODE`;
 
-    const params = { CLINIC_CODE: input.CLINIC_CODE }
+    const params = { CLINIC_CODE: input.CLINIC_CODE };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, d: records });
@@ -805,7 +1430,13 @@ export default class consultationController {
     const input = req.method === "GET" ? req.query : req.body;
     const sql = `SELECT ISNULL(PATIENTMR_NO,'') AS MRNO FROM PATIENT_MASTER WHERE FIRSTNAME=@FNAME AND LASTNAME=@LNAME AND Gender=@GENDER AND convert(varchar(10), Patient_DOB,120)=@DOB AND MOBILE=@MOBILE `;
 
-    const params = { FNAME: input.FNAME, LNAME: input.LNAME, GENDER: input.GENDER, DOB: input.DOB, MOBILE: input }
+    const params = {
+      FNAME: input.FNAME,
+      LNAME: input.LNAME,
+      GENDER: input.GENDER,
+      DOB: input.DOB,
+      MOBILE: input,
+    };
 
     try {
       const { records } = await executeDbQuery(sql, params);
@@ -817,9 +1448,9 @@ export default class consultationController {
 
   async getTokenNo(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
-    const sql = `SELECT GENTOKEN FROM OPD_DOCTTOKENNO WHERE DOCTCODE=@DOCTCD AND CLNORGCODE=@HOSPID AND CONVERT(VARCHAR(10),CONSDATE,120)=CONVERT(VARCHAR(10),GETDATE(),120) `;
+    const sql = `SELECT GENTOKEN FROM OPD_DOCTTOKENNO WHERE DOCTCODE=@DOCTCODE AND CLNORGCODE=@HOSPID AND CONVERT(VARCHAR(10),CONSDATE,120)=CONVERT(VARCHAR(10),GETDATE(),120) `;
 
-    const params = { DOCTCODE: input.DOCTCODE, HOSPID: input.HospitalId }
+    const params = { DOCTCODE: input.DOCTCODE, HOSPID: input.HospitalId };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -833,7 +1464,7 @@ export default class consultationController {
     const sql = `SELECT count(*) FROM OPD_CONSULTATION WHERE MEDRECNO=@MRNO and status<>'C' `;
     const sql1 = `select HospitalName from HospitalsList `;
 
-    const params = { MRNO: input.MRNO }
+    const params = { MRNO: input.MRNO };
     try {
       const { records } = await executeDbQuery(sql, params);
       const records1 = await executeDbQuery(sql1, []);
@@ -848,7 +1479,7 @@ export default class consultationController {
     const input = req.method === "GET" ? req.query : req.body;
     const sql = `select CLINIC_NAME,ADDRESS,PHONE From tm_clinics WHERE CLINIC_CODE=@hospid`;
 
-    const params = { hospid: input.hospid }
+    const params = { hospid: input.hospid };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -861,10 +1492,11 @@ export default class consultationController {
     const input = req.method === "GET" ? req.query : req.body;
 
     try {
-
       const doctorQuery = `SELECT isnull(MobileNo,'') as MobileNo,isnull(Email,'') as Email,RoomNo, registrationNo, Qualification,isnull(Qualification1,'') as Qualification1,isnull(Qualification2,'') as Qualification2,isnull(Qualification3,'') as Qualification3,isnull(Qualification4,'') as Qualification4 FROM Mst_DoctorMaster WHERE Code=@DoctCode and status<>'C'`;
 
-      const doctorResult = await executeDbQuery(doctorQuery, { DoctCode: input.DoctCode });
+      const doctorResult = await executeDbQuery(doctorQuery, {
+        DoctCode: input.DoctCode,
+      });
 
       let lst: string[] = [];
 
@@ -879,13 +1511,15 @@ export default class consultationController {
           dr.Qualification3,
           dr.Qualification4,
           dr.MobileNo,
-          dr.Email
+          dr.Email,
         );
       }
 
       const tokenQuery = `select TOKENNO from OPD_CONSULTATION where OPDBILLNO=@ConsultNo or consultno=@ConsultNo`;
 
-      const tokenResult = await executeDbQuery(tokenQuery, { ConsultNo: input.ConsultNo });
+      const tokenResult = await executeDbQuery(tokenQuery, {
+        ConsultNo: input.ConsultNo,
+      });
 
       if (tokenResult.records.length > 0) {
         lst.push(tokenResult.records[0].TOKENNO);
@@ -895,7 +1529,6 @@ export default class consultationController {
 
       res.json({ status: 1, d: lst });
     } catch (err: any) {
-
       res.status(500).json({ status: 0, error: err.message });
     }
   }
@@ -903,7 +1536,7 @@ export default class consultationController {
   async GetCONSBYDEPT(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
     const sql = `select CONSBYDEPT from  Mst_DoctorMaster where Status='A' and code=@DOCTCD`;
-    const params = { DOCTCD: input.DOCTCODE }
+    const params = { DOCTCD: input.DOCTCODE };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -926,7 +1559,10 @@ export default class consultationController {
         user.validdays = row.valid_days?.toString() || "0";
 
         const validDaysNum = Number(user.validdays);
-        const today = moment(input.consdate, "DD/MM/YYYY").add(validDaysNum - 1, "days");
+        const today = moment(input.consdate, "DD/MM/YYYY").add(
+          validDaysNum - 1,
+          "days",
+        );
         user.VALIDUPTO = today.format("DD/MMM/YYYY");
 
         details.push(user);
@@ -941,7 +1577,7 @@ export default class consultationController {
   async GetPaymentType1(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
     const sql = ` SELECT PAYMENT_TYPE FROM MST_PATIENTCATEGORY WHERE PC_CODE=@CATGCD`;
-    const params = { CATGCD: input.CATGCD }
+    const params = { CATGCD: input.CATGCD };
     try {
       const { records } = await executeDbQuery(sql, params);
       res.json({ status: 0, result: records });
@@ -953,19 +1589,20 @@ export default class consultationController {
   async Check_Duplicate(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
 
-
     let ddobjects: { idField: string }[] = [];
-    let WhereCond = '';
+    let WhereCond = "";
     try {
-
       if (input.WhereCond) {
         WhereCond = input.WhereCond.replace(/&quot;/g, "'");
       }
 
       let query = ` SELECT COUNT(${input.checkonField}) as Cnt, ${input.checkonField} FROM ${input.TableName} WHERE 1=1 AND ${input.checkonField} = @checkValue `;
 
-      if (WhereCond && WhereCond.trim().length > 0 && WhereCond.trim() !== "''") {
-
+      if (
+        WhereCond &&
+        WhereCond.trim().length > 0 &&
+        WhereCond.trim() !== "''"
+      ) {
         if (!/=|>|<|LIKE/i.test(WhereCond)) {
           throw new Error(`Invalid WhereCond: ${WhereCond}`);
         }
@@ -974,7 +1611,9 @@ export default class consultationController {
 
       query += ` GROUP BY ${input.checkonField} HAVING COUNT(${input.checkonField}) >= 1`;
 
-      const { records } = await executeDbQuery(query, { checkValue: input.checkValue });
+      const { records } = await executeDbQuery(query, {
+        checkValue: input.checkValue,
+      });
 
       for (const row of records) {
         ddobjects.push({ idField: row[input.checkonField] });
@@ -984,15 +1623,16 @@ export default class consultationController {
       res.json({ status: 0, result: ddobjects });
     } catch (err: any) {
       res.status(500).json({ status: 1, result: err.message });
-
     }
   }
 
-  async Check_DuplicateDoctorPatcon(req: Request, res: Response): Promise<void> {
+  async Check_DuplicateDoctorPatcon(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
 
     try {
-
       let query = `SELECT DOCTCODE, MEDRECNO FROM OPD_DOCTPATCON WHERE MEDRECNO = @mrno AND DOCTCODE IN (SELECT code FROM Mst_DoctorMaster WHERE Status = 'A' AND CONSBYDEPT = 'Y' AND DOCTCODE=@Doctcd)`;
 
       const params = { mrno: input.mrno, Doctcd: input.Doctcd };
@@ -1000,17 +1640,18 @@ export default class consultationController {
       const { records } = await executeDbQuery(query, params);
 
       res.json({ status: 0, result: records });
-
     } catch (err: any) {
       res.status(500).json({ status: 1, message: err.message });
     }
   }
 
-  async Check_DuplicateDoctorPatcon1(req: Request, res: Response): Promise<void> {
+  async Check_DuplicateDoctorPatcon1(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
 
     try {
-
       let query = `SELECT DOCTCODE, MEDRECNO FROM OPD_DOCTPATCON WHERE MEDRECNO = @mrno AND DOCTCODE IN (SELECT code FROM Mst_DoctorMaster WHERE Status = 'A' AND CONSBYDEPT = 'Y' AND Department = @DEPTCODE)`;
 
       const params = { mrno: input.mrno, DEPTCODE: input.DEPTCODE };
@@ -1018,7 +1659,6 @@ export default class consultationController {
       const { records } = await executeDbQuery(query, params);
 
       res.json({ status: 0, result: records });
-
     } catch (err: any) {
       res.status(500).json({ status: 1, message: err.message });
     }
@@ -1032,9 +1672,10 @@ export default class consultationController {
     try {
       await transaction.begin();
 
-      const spName = input.pattype === "D"
-        ? "Patient_Master_INSERT_DP"
-        : "Patient_Master_INSERT";
+      const spName =
+        input.pattype === "D"
+          ? "Patient_Master_INSERT_DP"
+          : "Patient_Master_INSERT";
 
       const sql = `
         DECLARE @MRNO VARCHAR(50);
@@ -1196,9 +1837,7 @@ export default class consultationController {
         LetterNo: input.letterno,
         Limit: input.limit,
         ValidDate: input.validdate || null,
-        Image_Name: input.imagepath
-          ? `/PatientImages/${input.imagepath}`
-          : '',
+        Image_Name: input.imagepath ? `/PatientImages/${input.imagepath}` : "",
         AppointmentNO: null,
         EXPDUEDATE: null,
         REVISIONID: null,
@@ -1220,13 +1859,13 @@ export default class consultationController {
         CREATED_ON: input.Crated_On,
         CLNORGCODE: input.hospitalId,
         EDITED_BY: null,
-        EDITED_ON: null
+        EDITED_ON: null,
       };
 
       const { records } = await executeDbQuery(sql, params, {
         transaction: transaction,
         query: `EXEC ${spName}`,
-        params: params
+        params: params,
       });
 
       await transaction.commit();
@@ -1235,8 +1874,9 @@ export default class consultationController {
         const { MRNO } = records[0];
         res.status(200).json({ status: 0, MRNO: MRNO, OPNum: input.OPDNum });
       } else {
-        res.status(200).json({ status: 1, message: "No data returned from SP" });
-
+        res
+          .status(200)
+          .json({ status: 1, message: "No data returned from SP" });
       }
     } catch (err: any) {
       await transaction.rollback();
@@ -1253,8 +1893,8 @@ export default class consultationController {
       await transaction.begin();
 
       // Get session values
-      const sessionCounterID = input.CounterId || '';
-      const sessionUID = input.userId || '';
+      const sessionCounterID = input.CounterId || "";
+      const sessionUID = input.userId || "";
 
       // Step 1: Call OPD_CONSULTATION_INSERT
       const sp1Name = "OPD_CONSULTATION_INSERT";
@@ -1327,7 +1967,7 @@ export default class consultationController {
         RECEIVEDON: input.RECEIVEDON,
         CONSAUTHBY: input.CONSAUTHBY,
         CREDAUTHBY: input.CREDAUTHBY,
-        DISCAUTHBY: input.DISCAUTHBY || '',
+        DISCAUTHBY: input.DISCAUTHBY || "",
         ADVADJAMT: input.ADVADJAMT,
         TRANCODE: input.TRANCODE,
         MATERNITY: input.MATERNITY,
@@ -1343,8 +1983,8 @@ export default class consultationController {
         SNCTPROOF: input.SNCTPROOF,
         CREATED_BY: sessionUID,
         CREATED_ON: input.Crated_On,
-        EDITED_BY: input.EDITED_BY || '',
-        EDITED_ON: input.EDITED_ON || '',
+        EDITED_BY: input.EDITED_BY || "",
+        EDITED_ON: input.EDITED_ON || "",
         STATUS: input.STATUS,
         Duedate: input.Duedate,
         ChequeNo: input.ChequeNo,
@@ -1359,7 +1999,7 @@ export default class consultationController {
         InprocessTime: input.InprocessTime,
         ClosedTime: input.ClosedTime,
         MLC: input.MLC,
-        DISCOUNTON: input.DISCOUNTON
+        DISCOUNTON: input.DISCOUNTON,
       };
 
       const sp1Query = `EXEC ${sp1Name} 
@@ -1391,14 +2031,14 @@ export default class consultationController {
         const appParams = {
           CLNORGCODE: input.CLNORGCODE,
           MEDRECNO: input.MEDRECNO,
-          MOBILENO: '91' + input.MOBILENO,
+          MOBILENO: "91" + input.MOBILENO,
           DOCTCODE: input.DOCTCODE,
           OPDBILLNO: input.OPDBILLNO,
-          CONSTYPE: '00' + input.CONSTYPE,
+          CONSTYPE: "00" + input.CONSTYPE,
           PATTYPE: input.PATTYPE,
           TOTALAMT: input.TOTALAMT,
           UID: sessionUID,
-          VISITTYPE: input.VISITTYPE
+          VISITTYPE: input.VISITTYPE,
         };
 
         await executeDbQuery(appQuery, appParams, { transaction });
@@ -1411,9 +2051,13 @@ export default class consultationController {
         `;
       const checkParams = {
         MEDRECNO: input.MEDRECNO,
-        DOCTCODE: input.DOCTCODE
+        DOCTCODE: input.DOCTCODE,
       };
-      const { records: checkResult } = await executeDbQuery(checkQuery, checkParams, { transaction });
+      const { records: checkResult } = await executeDbQuery(
+        checkQuery,
+        checkParams,
+        { transaction },
+      );
 
       // Step 4: Call OPD_BILLMST_INSERT
       const sp2Name = "OPD_BILLMST_INSERT";
@@ -1537,8 +2181,8 @@ export default class consultationController {
         POSTDATE: input.POSTDATE,
         CREATED_BY: sessionUID,
         CREATED_ON: input.Crated_On,
-        EDITED_BY: input.EDITED_BY || '',
-        EDITED_ON: input.EDITED_ON || '',
+        EDITED_BY: input.EDITED_BY || "",
+        EDITED_ON: input.EDITED_ON || "",
         CANCELDBY: input.CANCELDBY,
         CANCELDON: input.CANCELDON,
         STATUS: input.STATUS,
@@ -1546,7 +2190,7 @@ export default class consultationController {
         WardNo: input.WardNo,
         BedNO: input.BedNO,
         RevisionId: input.REVISIONID,
-        ReferralAgent: input.ReferralAgent
+        ReferralAgent: input.ReferralAgent,
       };
 
       const sp2Query = `EXEC ${sp2Name} 
@@ -1593,14 +2237,14 @@ export default class consultationController {
           DEPTCODE: input.DEPTCODE,
           CREATED_BY: sessionUID,
           CREATED_ON: input.Crated_On,
-          EDITED_BY: input.EDITED_BY || '',
-          EDITED_ON: input.EDITED_ON || '',
+          EDITED_BY: input.EDITED_BY || "",
+          EDITED_ON: input.EDITED_ON || "",
           STATUS: input.STATUS,
           CNNO: "",
           PC_Code: input.PATCATG,
           TARIFFID: input.TARIFFID,
           REVISIONID: input.REVISIONID,
-          OPDREGNO: input.OPNum
+          OPDREGNO: input.OPNum,
         };
 
         const sp3Query = `EXEC ${sp3Name} 
@@ -1650,18 +2294,77 @@ export default class consultationController {
 
     try {
       await transaction.begin();
-      const params = { CLNORGCODE: input.CLNORGCODE, CASHCOUNTER: input.CASHCOUNTER, BILLTYPE: input.BILLTYPE, BILLNO: input.BILLNO, SERVCODE: input.SERVCODE, QUANTITY: input.QUANTITY, COVRATE: input.COVRATE, UNCOVRATE: input.UNCOVRATE, NETRATE: input.NETRATE, PATAMOUNT: input.PATAMOUNT, COMAMOUNT: input.COMAMOUNT, PATCNAMT: input.PATCNAMT, COMCNAMT: input.COMCNAMT, PATDISC: input.PATDISC, COMDISC: input.COMDISC, OPCNNO: input.OPCNNO, REMARKS: input.REMARKS, ORDGENYN: input.ORDGENYN, SERCANSTAT: input.SERCANSTAT, RFNDSTAT: input.RFNDSTAT, DGREGSTAT: input.DGREGSTAT, DEPTCODE: input.DEPTCODE, LEDGRPCODE: input.LEDGRPCODE, SRVGRPCODE: input.SRVGRPCODE, TRAN_PERIOD: input.TRAN_PERIOD, FUNDSOURCE: input.FUNDSOURCE, SUBGRPCODE: input.SUBGRPCODE, SRVTYPCODE: input.SRVTYPCODE, SERDISCOUNT: input.SERDISCOUNT, NET: input.NET, RATE: input.RATE, AMOUNT: input.AMOUNT, DOCTCODE: input.DOCTCODE, DOCTSHARE: input.DOCTSHARE, TECHSHARE: input.TECHSHARE, SURCHARGE: input.SURCHARGE, ADDSURCHRG: input.ADDSURCHRG, DOCTAMT: input.DOCTAMT, HOSPSHARE: input.HOSPSHARE, ORGDOCSHAR: input.ORGDOCSHAR, TRANCODE: input.TRANCODE, SURCHRGNOT: input.SURCHRGNOT, SHARDOCT: input.SHARDOCT, SURGCODE: input.SURGCODE, PACKAGECODE: input.PACKAGECODE, DOCTPOSTDT: input.DOCTPOSTDT, SRVTAXYN: input.SRVTAXYN, SRVTAXAMT: input.SRVTAXAMT, EDUCESAMT: input.EDUCESAMT, SHECESAMT: input.SHECESAMT, RENDQTY: input.RENDQTY, DOCTPOST: input.DOCTPOST, CREATED_BY: input.CREATED_BY, Dper: input.Dper, RevisionId: input.RevisionId };
+      const params = {
+        CLNORGCODE: input.CLNORGCODE,
+        CASHCOUNTER: input.CASHCOUNTER,
+        BILLTYPE: input.BILLTYPE,
+        BILLNO: input.BILLNO,
+        SERVCODE: input.SERVCODE,
+        QUANTITY: input.QUANTITY,
+        COVRATE: input.COVRATE,
+        UNCOVRATE: input.UNCOVRATE,
+        NETRATE: input.NETRATE,
+        PATAMOUNT: input.PATAMOUNT,
+        COMAMOUNT: input.COMAMOUNT,
+        PATCNAMT: input.PATCNAMT,
+        COMCNAMT: input.COMCNAMT,
+        PATDISC: input.PATDISC,
+        COMDISC: input.COMDISC,
+        OPCNNO: input.OPCNNO,
+        REMARKS: input.REMARKS,
+        ORDGENYN: input.ORDGENYN,
+        SERCANSTAT: input.SERCANSTAT,
+        RFNDSTAT: input.RFNDSTAT,
+        DGREGSTAT: input.DGREGSTAT,
+        DEPTCODE: input.DEPTCODE,
+        LEDGRPCODE: input.LEDGRPCODE,
+        SRVGRPCODE: input.SRVGRPCODE,
+        TRAN_PERIOD: input.TRAN_PERIOD,
+        FUNDSOURCE: input.FUNDSOURCE,
+        SUBGRPCODE: input.SUBGRPCODE,
+        SRVTYPCODE: input.SRVTYPCODE,
+        SERDISCOUNT: input.SERDISCOUNT,
+        NET: input.NET,
+        RATE: input.RATE,
+        AMOUNT: input.AMOUNT,
+        DOCTCODE: input.DOCTCODE,
+        DOCTSHARE: input.DOCTSHARE,
+        TECHSHARE: input.TECHSHARE,
+        SURCHARGE: input.SURCHARGE,
+        ADDSURCHRG: input.ADDSURCHRG,
+        DOCTAMT: input.DOCTAMT,
+        HOSPSHARE: input.HOSPSHARE,
+        ORGDOCSHAR: input.ORGDOCSHAR,
+        TRANCODE: input.TRANCODE,
+        SURCHRGNOT: input.SURCHRGNOT,
+        SHARDOCT: input.SHARDOCT,
+        SURGCODE: input.SURGCODE,
+        PACKAGECODE: input.PACKAGECODE,
+        DOCTPOSTDT: input.DOCTPOSTDT,
+        SRVTAXYN: input.SRVTAXYN,
+        SRVTAXAMT: input.SRVTAXAMT,
+        EDUCESAMT: input.EDUCESAMT,
+        SHECESAMT: input.SHECESAMT,
+        RENDQTY: input.RENDQTY,
+        DOCTPOST: input.DOCTPOST,
+        CREATED_BY: input.CREATED_BY,
+        Dper: input.Dper,
+        RevisionId: input.RevisionId,
+      };
 
       const result = await executeDbQuery(insertQuery, params, { transaction });
 
       await transaction.commit();
 
       if (result.rowsAffected[0] > 0) {
-        res.json({ status: 0, result: "Inserted successfully", billNo: input.BILLNO });
+        res.json({
+          status: 0,
+          result: "Inserted successfully",
+          billNo: input.BILLNO,
+        });
       } else {
         res.json({ status: 1, result: "Insert failed" });
       }
-
     } catch (err: any) {
       await transaction.rollback();
       res.status(500).json({ status: 1, result: err.message });
@@ -1855,7 +2558,10 @@ export default class consultationController {
         NATLCODE: input.Nationality,
         RELGCODE: input.Religion,
         fathername: input.fathername,
-        CREATED_BY: input.userId, CREATED_ON: input.Crated_On, EDITED_BY: input.userId, EDITED_ON: input.Crated_On,
+        CREATED_BY: input.userId,
+        CREATED_ON: input.Crated_On,
+        EDITED_BY: input.userId,
+        EDITED_ON: input.Crated_On,
       };
 
       await executeDbQuery(insertQuery, params, { transaction });
@@ -1899,7 +2605,7 @@ export default class consultationController {
       await transaction.begin();
 
       // Get session values
-      const sessionUID = input.userId || '';
+      const sessionUID = input.userId || "";
 
       // Step 1: Call OPD_DOCTPATCON_INSERT stored procedure
       const spName = "OPD_DOCTPATCON_INSERT";
@@ -1907,41 +2613,46 @@ export default class consultationController {
         CLNORGCODE: input.CLNORGCODE,
         DOCTCODE: input.DOCTCODE,
         MEDRECNO: input.MEDRECNO,
-        IPNO: input.IPNO ,
-        CONSULTATIONTYPE: input.CONSULTATIONTYPE ,
-        EPISODENO: input.EPISODENO ,
+        IPNO: input.IPNO,
+        CONSULTATIONTYPE: input.CONSULTATIONTYPE,
+        EPISODENO: input.EPISODENO,
         PAIDCONSDATE: input.PAIDCONSDATE,
-        PAIDCONSNO: input.PAIDCONSNO ,
-        PREVISITDATE: input.PREVISITDATE ,
-        LASTVISITDATE: input.LASTVISITDATE ,
+        PAIDCONSNO: input.PAIDCONSNO,
+        PREVISITDATE: input.PREVISITDATE,
+        LASTVISITDATE: input.LASTVISITDATE,
         VISITS: input.VISITS || 0,
         CREATED_BY: sessionUID,
         CREATED_ON: input.Crated_On,
-        EDITED_BY: input.EDITED_BY || '',
-        EDITED_ON: input.EDITED_ON || '1900-01-01',
-        STATUS: input.STATUS || 'A',
+        EDITED_BY: input.EDITED_BY || "",
+        EDITED_ON: input.EDITED_ON || "1900-01-01",
+        STATUS: input.STATUS || "A",
         FreeVisit: input.FreeVisit || 0,
         PaidVisit: input.PaidVisit || 0,
-        VisitType: input.VisitType ,
-        DPCId: input.DPCId ,
-        REVISIONID: input.REVISIONID  ,
-        IPFollowUp_Visits: input.IP_VISITS || 0
+        VisitType: input.VisitType,
+        DPCId: input.DPCId,
+        REVISIONID: input.REVISIONID,
+        IPFollowUp_Visits: input.IP_VISITS || 0,
       };
-      
+
       const spQuery = `EXEC ${spName} 
       @CLNORGCODE, @DOCTCODE, @MEDRECNO, @IPNO, @CONSULTATIONTYPE, @EPISODENO, 
       @PAIDCONSDATE, @PAIDCONSNO, @PREVISITDATE, @LASTVISITDATE, @VISITS, 
       @CREATED_BY, @CREATED_ON, @EDITED_BY, @EDITED_ON, @STATUS, @FreeVisit, 
       @PaidVisit, @VisitType, @DPCId, @REVISIONID, @IPFollowUp_Visits`;
 
-      const { records } = await executeDbQuery(spQuery, spParams, { transaction });
+      const { records } = await executeDbQuery(spQuery, spParams, {
+        transaction,
+      });
 
       // Commit transaction
       await transaction.commit();
 
       // Return the result count (similar to C# returning result.ToString())
-      res.json({ status: 0, message: "Success", result: records ? records.length : 1 });
-
+      res.json({
+        status: 0,
+        message: "Success",
+        result: records ? records.length : 1,
+      });
     } catch (err: any) {
       // Rollback transaction on error
       await transaction.rollback();
@@ -1960,7 +2671,7 @@ export default class consultationController {
       await transaction.begin();
 
       // Get session values
-      const sessionUID = input.userId || '';
+      const sessionUID = input.userId || "";
 
       // Call OPD_DOCTPATCON_UPDATE stored procedure
       const spName = "OPD_DOCTPATCON_UPDATE";
@@ -1980,13 +2691,13 @@ export default class consultationController {
         CREATED_ON: input.Crated_On,
         EDITED_BY: input.Crated_On,
         EDITED_ON: sessionUID,
-        STATUS: input.STATUS || 'A',
+        STATUS: input.STATUS || "A",
         FreeVisit: input.FreeVisit || 0,
         PaidVisit: input.PaidVisit || 0,
         VisitType: input.VisitType || null,
         REVISIONID: input.REVISIONID || null,
-        // DEPTCODE: input.DEPTCODE || null, @DEPTCODE, 
-        IPFollowUp_Visits: input.IP_VISITS || 0
+        // DEPTCODE: input.DEPTCODE || null, @DEPTCODE,
+        IPFollowUp_Visits: input.IP_VISITS || 0,
       };
 
       const spQuery = `EXEC ${spName} 
@@ -1995,14 +2706,15 @@ export default class consultationController {
       @CREATED_BY, @CREATED_ON, @EDITED_BY, @EDITED_ON, @STATUS, @FreeVisit, 
       @PaidVisit, @VisitType, @REVISIONID, @IPFollowUp_Visits`;
 
-      const { records } = await executeDbQuery(spQuery, spParams, { transaction });
+      const { records } = await executeDbQuery(spQuery, spParams, {
+        transaction,
+      });
 
       // Commit transaction
       await transaction.commit();
 
       // Return the result count (similar to C# returning result.ToString())
       res.json({ status: 0, message: "Success", result: records });
-
     } catch (err: any) {
       // Rollback transaction on error
       await transaction.rollback();
@@ -2021,7 +2733,7 @@ export default class consultationController {
       await transaction.begin();
 
       // Get session values
-      const sessionUID = input.userId || '';
+      const sessionUID = input.userId || "";
 
       // Call OPD_DOCTPATCON_UPDATE_Y stored procedure
       const spName = "OPD_DOCTPATCON_UPDATE_Y";
@@ -2041,13 +2753,13 @@ export default class consultationController {
         CREATED_ON: input.Crated_On,
         EDITED_BY: input.Crated_On,
         EDITED_ON: sessionUID,
-        STATUS: input.STATUS || 'A',
+        STATUS: input.STATUS || "A",
         FreeVisit: input.FreeVisit || 0,
         PaidVisit: input.PaidVisit || 0,
         VisitType: input.VisitType || null,
         REVISIONID: input.REVISIONID || null,
         DEPTCODE: input.DEPTCODE || null,
-        IPFollowUp_Visits: input.IP_VISITS || 0
+        IPFollowUp_Visits: input.IP_VISITS || 0,
       };
 
       const spQuery = `EXEC ${spName} 
@@ -2056,14 +2768,15 @@ export default class consultationController {
       @CREATED_BY, @CREATED_ON, @EDITED_BY, @EDITED_ON, @STATUS, @FreeVisit, 
       @PaidVisit, @VisitType, @REVISIONID, @DEPTCODE, @IPFollowUp_Visits`;
 
-      const { records } = await executeDbQuery(spQuery, spParams, { transaction });
+      const { records } = await executeDbQuery(spQuery, spParams, {
+        transaction,
+      });
 
       // Commit transaction
       await transaction.commit();
 
       // Return the result count (similar to C# returning result.ToString())
       res.json({ status: 0, message: "Success", result: records });
-
     } catch (err: any) {
       // Rollback transaction on error
       await transaction.rollback();
@@ -2076,8 +2789,6 @@ export default class consultationController {
   async getPatientList(req: Request, res: Response): Promise<void> {
     const input: PatSearchCriteria = req.body.pat || {};
 
-
-    // HTML table start
     let table = `
     <thead>
       <tr class='success'>
@@ -2098,33 +2809,61 @@ export default class consultationController {
   `;
 
     try {
-      const query = `EXEC USP_GET_PATIENT_DETAILS @HospitalId = @HospitalId, @PATTYPE = @PATTYPE, @MRNO =  @MRNO, @DOCTCODE = @DOCTCODE, @IPNO = @IPNO, @OPDREGNO = @OPDREGNO`;
+      const query = `EXEC USP_GET_PATIENT_DETAILS @HospitalId = @HospitalId, @PATTYPE = @PATTYPE, @MRNO = @MRNO, @DOCTCODE = @DOCTCODE, @IPNO = @IPNO, @OPDREGNO = @OPDREGNO`;
 
-      const params = { HospitalId: input.hospid, PATTYPE: input.pattypesearch, MRNO: input.mrno, DOCTCODE: input.doctcd, IPNO: input.ipno, OPDREGNO: input.patOPNum };
+      const params = {
+        HospitalId: input.hospid,
+        PATTYPE: input.pattypesearch,
+        MRNO: input.mrno,
+        DOCTCODE: input.doctcd,
+        IPNO: input.ipno,
+        OPDREGNO: input.patOPNum,
+      };
 
       const result = await executeDbQuery(query, params);
       const records = result.records || [];
-      for (const dr of records) {
+
+      const patientList = records.map((dr: any) => ({
+        PatientMr_No: dr["PatientMr_No"] || "",
+        patMrnoDOM: input.patMrnoDOM || "",
+        IPNO: dr["IPNO"] || "",
+        patIpnoDOM: input.patIpnoDOM || "",
+        Patient_Name: dr["Patient_Name"] || "",
+        Gender: dr["Gender"] || "",
+        Age: dr["Age"] || "",
+        Patient_DOB: dr["Patient_DOB"]
+          ? formatDateChange(dr["Patient_DOB"])
+          : "",
+        Mobile: dr["Mobile"] || "",
+        Address1: dr["Address1"] || "",
+        fathername: dr["fathername"] || "",
+      }));
+
+      for (const row of patientList) {
         table += `
         <tr>
-          <td style='text-align: left;'>${dr["PatientMr_No"] || ""}</td>
-          <td style='text-align: left; display:none'>${input.patMrnoDOM || ""}</td>
-          <td style='text-align: left;'>${dr["IPNO"] || ""}</td>
-          <td style='text-align: left; display:none'>${input.patIpnoDOM || ""}</td>
-          <td style='text-align: left;'>${dr["Patient_Name"] || ""}</td>
-          <td style='text-align: left;'>${dr["Gender"] || ""}</td>
-          <td style='text-align: left;'>${dr["Age"] || ""}</td>
-          <td style='text-align: left;'>${dr["Patient_DOB"] ? formatDateChange(dr["Patient_DOB"]) : ""}</td>
-          <td style='text-align: left;'>${dr["Mobile"] || ""}</td>
-          <td style='text-align: left;'>${dr["Address1"] || ""}</td>
-          <td style='text-align: left;'>${dr["fathername"] || ""}</td>
+          <td style='text-align: left;'>${row.PatientMr_No}</td>
+          <td style='text-align: left; display:none'>${row.patMrnoDOM}</td>
+          <td style='text-align: left;'>${row.IPNO}</td>
+          <td style='text-align: left; display:none'>${row.patIpnoDOM}</td>
+          <td style='text-align: left;'>${row.Patient_Name}</td>
+          <td style='text-align: left;'>${row.Gender}</td>
+          <td style='text-align: left;'>${row.Age}</td>
+          <td style='text-align: left;'>${row.Patient_DOB}</td>
+          <td style='text-align: left;'>${row.Mobile}</td>
+          <td style='text-align: left;'>${row.Address1}</td>
+          <td style='text-align: left;'>${row.fathername}</td>
         </tr>
       `;
       }
 
-      table += "</tbody>";
+      table += `</tbody>`;
 
-      res.json({ status: 0, d: table });
+      res.json({
+        status: 0,
+        d: table,
+        result: patientList,
+      });
     } catch (err: any) {
       res.status(500).json({ status: 1, message: err.message });
     }
@@ -2133,7 +2872,6 @@ export default class consultationController {
   async setPatientDetails(req: Request, res: Response): Promise<void> {
     const input: PatSearchCriteria = req.body.pat || {};
 
-
     try {
       const params = {
         HospitalId: input.hospid,
@@ -2141,86 +2879,88 @@ export default class consultationController {
         MRNO: input.mrno,
         DOCTCODE: input.doctcd,
         IPNO: input.ipno,
-        OPDREGNO: input.patOPNum
+        OPDREGNO: input.patOPNum,
       };
 
       const query = "USP_GET_PATIENT_DETAILS";
 
       const dbRes = await executeDbQuery(query, params, { isStoredProc: true });
 
-      const patobj: PatientSearchObj[] = (dbRes.records || []).map((dr: any) => ({
-        consultno: dr.CONSULTNO,
-        consdate: formatDateChange(dr.CONSDATE),
-        mrno: dr.PatientMr_No,
-        ipno: dr.IPNO,
-        patsalutationid: dr.Salutation,
-        patname: dr.Patient_Name?.toUpperCase(),
-        gender: dr.Gender,
-        age: dr.Age,
-        dob: formatDateChange(dr.Patient_DOB),
-        mobile: dr.Mobile,
-        telphone: dr.Telephone,
-        email: dr.Email,
-        address1: dr.Address1,
-        address2: dr.Address2,
-        address3: dr.Address3,
-        pincode: dr.PinCode,
-        countryid: dr.Country,
-        stateid: dr.State,
-        districtid: dr.District,
-        cityid: dr.City_Id,
-        departmentid: dr.Department,
-        patcatid: dr.Patient_Category_Id,
-        tarifcatid: dr.Tariff_Category,
-        doctcd: dr.DOCTCODE,
-        doctname: dr.DOCTNAME,
-        patsalutation: dr.PAT_SALUTATION,
-        country: dr.Country_Name,
-        state: dr.State_Name,
-        district: dr.District_Name,
-        city: dr.CityName,
-        deptname: dr.DEPTNAME,
-        patcat: dr.PC_Name,
-        tarifcat: dr.TARIFFDESC,
-        firstname: dr.FirstName?.toUpperCase(),
-        middlename: dr.MiddleName?.toUpperCase(),
-        lastname: dr.LastName?.toUpperCase(),
-        fathername: dr.fathername?.toUpperCase(),
-        hieght: dr.Height,
-        weight: dr.weight,
-        bloodgroup: dr.Blood_Group?.trim(),
-        maritalstatus: dr.Marital_Status?.trim(),
-        pattype: dr.PatientType,
-        uniqueid: dr.UniqueId,
-        compid: dr.Comp_Id,
-        compname: dr.COMPName,
-        empidcardno: dr.EmpIdCardNo,
-        letterno: dr.LetterNo,
-        limit: dr.Limit,
-        validdate: formatDateChange(dr.ValidDate),
-        empid: dr.EmpId,
-        empname: dr.EmpName,
-        empreftype: dr.EmpRefType,
-        empdeptid: dr.EmpDept,
-        empdeptname: dr.DEPTNAME,
-        empdesgcd: dr.EmpDesgcode,
-        empdesgname: dr.DESGNAME,
-        refdoctcd: dr.RefDoct_ID,
-        refdoctname: dr.refdoctname?.toUpperCase(),
-        BEDNO: dr.BEDNO,
-        WARDNUMBER: dr.WARDNUMBER,
-        AdmitDt: dr.AdmitDt,
-        AdmitTM: dr.AdmitTM,
-        ADMNDOCTOR: dr.ADMNDOCTOR,
-        DoctorName: dr.DoctorName,
-        PRBEDCATG: dr.PRBEDCATG,
-        BedCategory: dr.BedCategory,
-        NURSCODE: dr.NURSCODE,
-        NURSINGSTATION: dr.NURSINGSTATION,
-        FOLIONO: dr.FOLIONO,
-        DISCHRGDT: formatDateChange(dr.DISCHRGDT),
-        OPNum: dr.OPDREGNO,
-      }));
+      const patobj: PatientSearchObj[] = (dbRes.records || []).map(
+        (dr: any) => ({
+          consultno: dr.CONSULTNO,
+          consdate: formatDateChange(dr.CONSDATE),
+          mrno: dr.PatientMr_No,
+          ipno: dr.IPNO,
+          patsalutationid: dr.Salutation,
+          patname: dr.Patient_Name?.toUpperCase(),
+          gender: dr.Gender,
+          age: dr.Age,
+          dob: formatDateChange(dr.Patient_DOB),
+          mobile: dr.Mobile,
+          telphone: dr.Telephone,
+          email: dr.Email,
+          address1: dr.Address1,
+          address2: dr.Address2,
+          address3: dr.Address3,
+          pincode: dr.PinCode,
+          countryid: dr.Country,
+          stateid: dr.State,
+          districtid: dr.District,
+          cityid: dr.City_Id,
+          departmentid: dr.Department,
+          patcatid: dr.Patient_Category_Id,
+          tarifcatid: dr.Tariff_Category,
+          doctcd: dr.DOCTCODE,
+          doctname: dr.DOCTNAME,
+          patsalutation: dr.PAT_SALUTATION,
+          country: dr.Country_Name,
+          state: dr.State_Name,
+          district: dr.District_Name,
+          city: dr.CityName,
+          deptname: dr.DEPTNAME,
+          patcat: dr.PC_Name,
+          tarifcat: dr.TARIFFDESC,
+          firstname: dr.FirstName?.toUpperCase(),
+          middlename: dr.MiddleName?.toUpperCase(),
+          lastname: dr.LastName?.toUpperCase(),
+          fathername: dr.fathername?.toUpperCase(),
+          hieght: dr.Height,
+          weight: dr.weight,
+          bloodgroup: dr.Blood_Group?.trim(),
+          maritalstatus: dr.Marital_Status?.trim(),
+          pattype: dr.PatientType,
+          uniqueid: dr.UniqueId,
+          compid: dr.Comp_Id,
+          compname: dr.COMPName,
+          empidcardno: dr.EmpIdCardNo,
+          letterno: dr.LetterNo,
+          limit: dr.Limit,
+          validdate: formatDateChange(dr.ValidDate),
+          empid: dr.EmpId,
+          empname: dr.EmpName,
+          empreftype: dr.EmpRefType,
+          empdeptid: dr.EmpDept,
+          empdeptname: dr.DEPTNAME,
+          empdesgcd: dr.EmpDesgcode,
+          empdesgname: dr.DESGNAME,
+          refdoctcd: dr.RefDoct_ID,
+          refdoctname: dr.refdoctname?.toUpperCase(),
+          BEDNO: dr.BEDNO,
+          WARDNUMBER: dr.WARDNUMBER,
+          AdmitDt: dr.AdmitDt,
+          AdmitTM: dr.AdmitTM,
+          ADMNDOCTOR: dr.ADMNDOCTOR,
+          DoctorName: dr.DoctorName,
+          PRBEDCATG: dr.PRBEDCATG,
+          BedCategory: dr.BedCategory,
+          NURSCODE: dr.NURSCODE,
+          NURSINGSTATION: dr.NURSINGSTATION,
+          FOLIONO: dr.FOLIONO,
+          DISCHRGDT: formatDateChange(dr.DISCHRGDT),
+          OPNum: dr.OPDREGNO,
+        }),
+      );
 
       res.json({ status: 0, result: patobj });
       return;
@@ -2241,14 +2981,14 @@ export default class consultationController {
         // Query OPD_DOCTPATCON
         const opdRes = await executeDbQuery(
           "SELECT COUNT(*) as CNT FROM OPD_DOCTPATCON WHERE MEDRECNO = @MedrecNo AND STATUS <> 'C'",
-          { MedrecNo: input.MedrecNo }
+          { MedrecNo: input.MedrecNo },
         );
         result = safeNumber(opdRes.records[0]?.CNT);
 
         // Query IPD_ADMISSION
         const ipdRes = await executeDbQuery(
           "SELECT COUNT(*) as CNT FROM IPD_ADMISSION WHERE MEDRECNO = @MedrecNo AND STATUS <> 'C'",
-          { MedrecNo: input.MedrecNo }
+          { MedrecNo: input.MedrecNo },
         );
         result1 = safeNumber(ipdRes.records[0]?.CNT);
       }
@@ -2272,7 +3012,8 @@ export default class consultationController {
           registrationFees.push({
             regfeetype: "P",
             opddiscount: 0,
-            regfeeamount: input.patcat === "003" ? 0 : safeNumber(dr.RegnFee_Amount),
+            regfeeamount:
+              input.patcat === "003" ? 0 : safeNumber(dr.RegnFee_Amount),
           });
         }
       }
@@ -2289,7 +3030,10 @@ export default class consultationController {
     const query = `select mu.USERNAME,billmst.BILLDATE,billmst.BILLNO , pm.PatientMr_No,sol.Sal_Desc,(pm.FirstName +' ' +pm.MiddleName+' '+pm.LastName) AS Patient_Name,pm.Gender,pm.Age,pm.Mobile,drsol.Sal_Desc as drSol,pm.FirstName,mdept.DEPTNAME,mstdoct.Firstname as DoctName,mp.PayMode ,rfDr.RefDoctor_FName as refraldoctr,rfDrsal.Sal_Desc  as refsal from  Patient_master pm left join Mst_Department mdept on pm.Department=mdept.DEPTCODE left join Mst_DoctorMaster mstdoct on pm.Doctor_Id=mstdoct.Code left join Mst_ReferralDoctor rfDr on rfDr.RefDoct_ID=pm.ReferralDoctor_ID left join Mst_Salutation sol on sol.Sal_Code=pm.Salutation left join OPD_BILLMST billmst  on billmst.MEDRECNO=pm.PatientMr_No left join Mst_UserDetails mu on pm.CREATED_BY=mu.USERID left join PayMode mp on mp.paymodeid=billmst.PAYMODE left join Mst_Salutation drsol on drsol.Sal_Code=mstdoct.Salutation  left join Mst_Salutation rfDrsal on rfDrsal.Sal_Code=rfDr.Salutation where  pm.PatientMr_No=@PatientMr_No and billmst.billno=@billno `;
 
     try {
-      const result = await executeDbQuery(query, { PatientMr_No: input.PatientMr_No, billno: input.billno });
+      const result = await executeDbQuery(query, {
+        PatientMr_No: input.PatientMr_No,
+        billno: input.billno,
+      });
 
       const details = result.records.map((row: any) => {
         const net = Math.round(Number(input.billamount || 0));
@@ -2318,7 +3062,6 @@ export default class consultationController {
 
       res.json({ status: 0, result: details });
     } catch (err: any) {
-
       res.status(500).json({ status: 1, message: err.message });
     }
   }
@@ -2380,7 +3123,10 @@ export default class consultationController {
     }
   }
 
-  async getPatientDetailsFromAppointment(req: Request, res: Response): Promise<void> {
+  async getPatientDetailsFromAppointment(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
     // In C#, Appointment object is passed in — here we read from body or query
     const input = req.method === "GET" ? req.query : req.body;
     const appointmentNo = input.appointno;
@@ -2389,39 +3135,41 @@ export default class consultationController {
       // Call the stored procedure
       const { records } = await executeDbQuery(
         "EXEC USP_GETPATDETFROMAPPOINTMENT @APPOINTMENTNO=@AppointmentNo",
-        { AppointmentNo: appointmentNo }
+        { AppointmentNo: appointmentNo },
       );
 
       // Map DB rows to PatDetailsFromAppointment[]
-      const appointments: PatDetailsFromAppointment[] = records.map((r: any) => ({
-        amount: r.visitamount !== null ? Number(r.visitamount) : undefined,
-        salutation: r.Salutation ?? "",
-        patname: r.Patient_Name ?? "",
-        patfname: r.FirstName ?? "",
-        patlname: r.LastName ?? "",
-        patage: r.Age ?? "",
-        mobile: r.Mobile ?? "",
-        email: r.Email ?? "",
-        dob: formatDateChange(r.Patient_DOB) ?? "",
-        gender: r.Gender ?? "",
-        countryid: r.Country ?? "",
-        countryname: r.Country_Name ?? "",
-        stateid: r.State ?? "",
-        statename: r.State_Name ?? "",
-        districtid: r.District ?? "",
-        districtname: r.District_Name ?? "",
-        cityidid: r.City_id ?? "",
-        cityname: r.CityName ?? "",
-        patcat: r.Patient_Category_Id ?? "",
-        addr1: r.Address1 ?? "",
-        addr2: r.Address2 ?? "",
-        addr3: r.Address3 ?? "",
-        visitytype: r.VISITTYPE ?? "",
-        doctcd: r.Code ?? "",
-        doctname: r.DRNAME ?? "",
-        deptcd: r.DEPCODE ?? "",
-        deptname: r.DEPTNAME ?? ""
-      }));
+      const appointments: PatDetailsFromAppointment[] = records.map(
+        (r: any) => ({
+          amount: r.visitamount !== null ? Number(r.visitamount) : undefined,
+          salutation: r.Salutation ?? "",
+          patname: r.Patient_Name ?? "",
+          patfname: r.FirstName ?? "",
+          patlname: r.LastName ?? "",
+          patage: r.Age ?? "",
+          mobile: r.Mobile ?? "",
+          email: r.Email ?? "",
+          dob: formatDateChange(r.Patient_DOB) ?? "",
+          gender: r.Gender ?? "",
+          countryid: r.Country ?? "",
+          countryname: r.Country_Name ?? "",
+          stateid: r.State ?? "",
+          statename: r.State_Name ?? "",
+          districtid: r.District ?? "",
+          districtname: r.District_Name ?? "",
+          cityidid: r.City_id ?? "",
+          cityname: r.CityName ?? "",
+          patcat: r.Patient_Category_Id ?? "",
+          addr1: r.Address1 ?? "",
+          addr2: r.Address2 ?? "",
+          addr3: r.Address3 ?? "",
+          visitytype: r.VISITTYPE ?? "",
+          doctcd: r.Code ?? "",
+          doctname: r.DRNAME ?? "",
+          deptcd: r.DEPCODE ?? "",
+          deptname: r.DEPTNAME ?? "",
+        }),
+      );
 
       // Return array like C# method
       res.json({ status: 0, result: appointments });
@@ -2440,8 +3188,6 @@ export default class consultationController {
       i = 0;
 
     try {
-
-
       const tempfromdate = formatDateForDb(input.fromdate);
       const temptodate = formatDateForDb(input.todate);
 
@@ -2452,7 +3198,15 @@ export default class consultationController {
       // Stored procedure call
       const query = ` EXEC USP_GET_CONSULTATIONLIST @FROMDATE=@FROMDATE, @TODATE=@TODATE, @DOCTCODE=@DOCTCODE, @MRNO=@MRNO, @USERID=@USERID, @COUNTERID=@COUNTERID, @CLNORGCODE=@CLNORGCODE `;
 
-      const params = { FROMDATE: tempfromdate, TODATE: temptodate, DOCTCODE: input.doctcode, MRNO: input.mrno, USERID, COUNTERID: CounterID, CLNORGCODE: hospid, };
+      const params = {
+        FROMDATE: tempfromdate,
+        TODATE: temptodate,
+        DOCTCODE: input.doctcode,
+        MRNO: input.mrno,
+        USERID,
+        COUNTERID: CounterID,
+        CLNORGCODE: hospid,
+      };
 
       const { records } = await executeDbQuery(query, params);
 
@@ -2513,7 +3267,10 @@ export default class consultationController {
           USERNAME: dr.USERNAME,
         };
 
-        let style1 = consultation.STATUS === "A" ? "" : "color:white !important;background-color:#ee6e73  !important;";
+        let style1 =
+          consultation.STATUS === "A"
+            ? ""
+            : "color:white !important;background-color:#ee6e73  !important;";
 
         table += `
         <tr style='text-align:left;'>
@@ -2673,7 +3430,11 @@ export default class consultationController {
 
       const { rowsAffected } = await executeDbQuery(query, params);
 
-      res.json({ status: 0, message: "Success", result: rowsAffected?.[0] ?? 0 });
+      res.json({
+        status: 0,
+        message: "Success",
+        result: rowsAffected?.[0] ?? 0,
+      });
     } catch (err: any) {
       res.status(500).json({ status: 1, message: err.message, result: 0 });
     }
@@ -2688,12 +3449,15 @@ export default class consultationController {
     try {
       await transaction.begin();
 
-      const { rowsAffected } = await executeDbQuery("OPD_CONSULTATION_UPDATE", { ConsultationNo: input.ConsultationNum, edited_by: input.UserId }, { transaction, isStoredProc: true });
+      const { rowsAffected } = await executeDbQuery(
+        "OPD_CONSULTATION_UPDATE",
+        { ConsultationNo: input.ConsultationNum, edited_by: input.UserId },
+        { transaction, isStoredProc: true },
+      );
 
       await transaction.commit();
 
       res.json({ status: 0, message: "Success", d: rowsAffected?.[0] ?? 1 });
-
     } catch (err: any) {
       try {
         await transaction.rollback();
@@ -2701,7 +3465,6 @@ export default class consultationController {
         res.status(500).json({ status: 1, message: err.message, result: 0 });
         return;
       }
-
     }
   }
 
@@ -2714,19 +3477,21 @@ export default class consultationController {
     try {
       await transaction.begin();
 
-      const { rowsAffected } = await executeDbQuery("OPD_CONSULTATION_UPDATE_Y", { ConsultationNo: input.ConsultationNum }, { transaction, isStoredProc: true });
+      const { rowsAffected } = await executeDbQuery(
+        "OPD_CONSULTATION_UPDATE_Y",
+        { ConsultationNo: input.ConsultationNum },
+        { transaction, isStoredProc: true },
+      );
 
       await transaction.commit();
 
       res.json({ status: 0, message: "Success", d: rowsAffected?.[0] ?? 1 });
-
     } catch (err: any) {
       try {
         await transaction.rollback();
       } catch (rollbackErr) {
         res.status(500).json({ status: 1, message: err.message, result: 0 });
       }
-
     }
   }
 
@@ -2739,19 +3504,21 @@ export default class consultationController {
     try {
       await transaction.begin();
 
-      const { rowsAffected } = await executeDbQuery("OPD_CONSULTATION_UPDATE_Y", { ConsultationNo: input.ConsultationNum }, { transaction, isStoredProc: true });
+      const { rowsAffected } = await executeDbQuery(
+        "OPD_CONSULTATION_UPDATE_Y",
+        { ConsultationNo: input.ConsultationNum },
+        { transaction, isStoredProc: true },
+      );
 
       await transaction.commit();
 
       res.json({ status: 0, message: "Success", d: rowsAffected?.[0] ?? 1 });
-
     } catch (err: any) {
       try {
         await transaction.rollback();
       } catch (rollbackErr) {
         res.status(500).json({ status: 1, message: err.message, result: 0 });
       }
-
     }
   }
 
@@ -2764,19 +3531,21 @@ export default class consultationController {
     try {
       await transaction.begin();
 
-      const { rowsAffected } = await executeDbQuery("OPD_CONSULTATION_UPDATE", { ConsultationNo: input.ConsultationNum }, { transaction, isStoredProc: true });
+      const { rowsAffected } = await executeDbQuery(
+        "OPD_CONSULTATION_UPDATE",
+        { ConsultationNo: input.ConsultationNum },
+        { transaction, isStoredProc: true },
+      );
 
       await transaction.commit();
 
       res.json({ status: 0, message: "Success", d: rowsAffected?.[0] ?? 1 });
-
     } catch (err: any) {
       try {
         await transaction.rollback();
       } catch (rollbackErr) {
         res.status(500).json({ status: 1, message: err.message, result: 0 });
       }
-
     }
   }
 
@@ -2789,27 +3558,37 @@ export default class consultationController {
     try {
       await transaction.begin();
 
-      const query = "INSERT INTO OPD_BILLMST_AUDIT (CLNORGCODE, FINYEAR, CASHCOUNTER, BILLTYPE, BILLNO, BEDCATGCD, RCPTNO, OPREGNO, MEDRECNO, BILLDATE, SALUTNCODE, PATNAME, PATFNAME, PATMNAME, PATLNAME, PATSURNAME, AGE, SEX, ADDRESS1, ADDRESS2, ADDRESS3, CITYCODE, DISTRICTCODE, STATECODE, COUNTRYCODE, PINCODE, MOBILENO, PAYMODE, CHEQUEDDNO, CHEQUEDATE, BANKNAME, REMARKS, REFBILLNO, REFDOCTCD, DOCTCD, CRDCOMPCD, LETTERNO, VALIDUPTO, DISPNO, DISPDATE, TOKENNO, TARIFFID, TOTCOVAMT, TOTUNCOVAMT, TOTSERVAMT, PATBILLAMT, PATDISCUNT, PATAMTPAID, PATAMTRCVD, PATCNAMT, PATRFNDAMT, COMBILLAMT, COMDISCUNT, COMAMTPAID, COMAMTRCVD, COMCNAMT, COMRFNDAMT, CREDAUTHBY, DISCAUTHBY, BILLSTAT, DRAWNON, PATCATG, CONSCATG, EMPID, EMPCODE, CLINICCODE, FUNDSOURCE, DEPTCODE, OPCONSNO, OPCONSAMT, OPREGFEE, COMPRCPT, POSTFLAG, NETAMOUNT, AMOUNTPAID, AMOUNTRCVD, CNAMOUNT, RFNDAMOUNT, TOTDISCOUNT, TOTALBILLAMT, ADDR4, ADDR5, CASETYPE, AUTHTRANID, REQUESTNO, CASHCOLL, EXMPTNO, ADVADJAMT, TRANCODE, SCROLLNO, EMERGENCYN, PATPHONE, COMPSTATUS, DISALOWAMT, BILLSOURCE, MATERNYN, EXPDUEDATE, IPNO, WRITOFFAMT, TAXAMT, OTEXPENTYN, TOTSRVTAX, SERVTAXON, SRVTAXAMT, EDUCESAMT, SHECESAMT, DEPTYPE, INSCOMPCD, INTLUPLDYN, ALLWCASHYN, SNCTPRFYN, SNCTPROOF, PISUID, PISPWD, DOCTPOST, LEDGPOST, POSTDATE, CREATED_BY, CREATED_ON, EDITED_BY, EDITED_ON, CANCELDBY, CANCELDON, STATUS, CONSTYPE, WardNo, BedNO, RevisionId, OPDREGNO, DISCCATG, ReferralAgent_ID, USERID, USERNAME, SYSTEM_IPADRESS, INSERTED_ON) SELECT CLNORGCODE, FINYEAR, CASHCOUNTER, BILLTYPE, BILLNO, BEDCATGCD, RCPTNO, OPREGNO, MEDRECNO, BILLDATE, SALUTNCODE, PATNAME, PATFNAME, PATMNAME, PATLNAME, PATSURNAME, AGE, SEX, ADDRESS1, ADDRESS2, ADDRESS3, CITYCODE, DISTRICTCODE, STATECODE, COUNTRYCODE, PINCODE, MOBILENO, PAYMODE, CHEQUEDDNO, CHEQUEDATE, BANKNAME, REMARKS, REFBILLNO, REFDOCTCD, DOCTCD, CRDCOMPCD, LETTERNO, VALIDUPTO, DISPNO, DISPDATE, TOKENNO, TARIFFID, TOTCOVAMT, TOTUNCOVAMT, TOTSERVAMT, PATBILLAMT, PATDISCUNT, PATAMTPAID, PATAMTRCVD, PATCNAMT, PATRFNDAMT, COMBILLAMT, COMDISCUNT, COMAMTPAID, COMAMTRCVD, COMCNAMT, COMRFNDAMT, CREDAUTHBY, DISCAUTHBY, BILLSTAT, DRAWNON, PATCATG, CONSCATG, EMPID, EMPCODE, CLINICCODE, FUNDSOURCE, DEPTCODE, OPCONSNO, OPCONSAMT, OPREGFEE, COMPRCPT, POSTFLAG, NETAMOUNT, AMOUNTPAID, AMOUNTRCVD, CNAMOUNT, RFNDAMOUNT, TOTDISCOUNT, TOTALBILLAMT, ADDR4, ADDR5, CASETYPE, AUTHTRANID, REQUESTNO, CASHCOLL, EXMPTNO, ADVADJAMT, TRANCODE, SCROLLNO, EMERGENCYN, PATPHONE, COMPSTATUS, DISALOWAMT, BILLSOURCE, MATERNYN, EXPDUEDATE, IPNO, WRITOFFAMT, TAXAMT, OTEXPENTYN, TOTSRVTAX, SERVTAXON, SRVTAXAMT, EDUCESAMT, SHECESAMT, DEPTYPE, INSCOMPCD, INTLUPLDYN, ALLWCASHYN, SNCTPRFYN, SNCTPROOF, PISUID, PISPWD, DOCTPOST, LEDGPOST, POSTDATE, CREATED_BY, CREATED_ON, EDITED_BY, EDITED_ON, CANCELDBY, CANCELDON, STATUS, CONSTYPE, WardNo, BedNO, RevisionId, OPDREGNO, DISCCATG, ReferralAgent_ID, @USERID, @USERNAME, @IPAddress, GETDATE() from OPD_BILLMST where medrecno=@MRNO and BILLNO=@BILLNO";
+      const query =
+        "INSERT INTO OPD_BILLMST_AUDIT (CLNORGCODE, FINYEAR, CASHCOUNTER, BILLTYPE, BILLNO, BEDCATGCD, RCPTNO, OPREGNO, MEDRECNO, BILLDATE, SALUTNCODE, PATNAME, PATFNAME, PATMNAME, PATLNAME, PATSURNAME, AGE, SEX, ADDRESS1, ADDRESS2, ADDRESS3, CITYCODE, DISTRICTCODE, STATECODE, COUNTRYCODE, PINCODE, MOBILENO, PAYMODE, CHEQUEDDNO, CHEQUEDATE, BANKNAME, REMARKS, REFBILLNO, REFDOCTCD, DOCTCD, CRDCOMPCD, LETTERNO, VALIDUPTO, DISPNO, DISPDATE, TOKENNO, TARIFFID, TOTCOVAMT, TOTUNCOVAMT, TOTSERVAMT, PATBILLAMT, PATDISCUNT, PATAMTPAID, PATAMTRCVD, PATCNAMT, PATRFNDAMT, COMBILLAMT, COMDISCUNT, COMAMTPAID, COMAMTRCVD, COMCNAMT, COMRFNDAMT, CREDAUTHBY, DISCAUTHBY, BILLSTAT, DRAWNON, PATCATG, CONSCATG, EMPID, EMPCODE, CLINICCODE, FUNDSOURCE, DEPTCODE, OPCONSNO, OPCONSAMT, OPREGFEE, COMPRCPT, POSTFLAG, NETAMOUNT, AMOUNTPAID, AMOUNTRCVD, CNAMOUNT, RFNDAMOUNT, TOTDISCOUNT, TOTALBILLAMT, ADDR4, ADDR5, CASETYPE, AUTHTRANID, REQUESTNO, CASHCOLL, EXMPTNO, ADVADJAMT, TRANCODE, SCROLLNO, EMERGENCYN, PATPHONE, COMPSTATUS, DISALOWAMT, BILLSOURCE, MATERNYN, EXPDUEDATE, IPNO, WRITOFFAMT, TAXAMT, OTEXPENTYN, TOTSRVTAX, SERVTAXON, SRVTAXAMT, EDUCESAMT, SHECESAMT, DEPTYPE, INSCOMPCD, INTLUPLDYN, ALLWCASHYN, SNCTPRFYN, SNCTPROOF, PISUID, PISPWD, DOCTPOST, LEDGPOST, POSTDATE, CREATED_BY, CREATED_ON, EDITED_BY, EDITED_ON, CANCELDBY, CANCELDON, STATUS, CONSTYPE, WardNo, BedNO, RevisionId, OPDREGNO, DISCCATG, ReferralAgent_ID, USERID, USERNAME, SYSTEM_IPADRESS, INSERTED_ON) SELECT CLNORGCODE, FINYEAR, CASHCOUNTER, BILLTYPE, BILLNO, BEDCATGCD, RCPTNO, OPREGNO, MEDRECNO, BILLDATE, SALUTNCODE, PATNAME, PATFNAME, PATMNAME, PATLNAME, PATSURNAME, AGE, SEX, ADDRESS1, ADDRESS2, ADDRESS3, CITYCODE, DISTRICTCODE, STATECODE, COUNTRYCODE, PINCODE, MOBILENO, PAYMODE, CHEQUEDDNO, CHEQUEDATE, BANKNAME, REMARKS, REFBILLNO, REFDOCTCD, DOCTCD, CRDCOMPCD, LETTERNO, VALIDUPTO, DISPNO, DISPDATE, TOKENNO, TARIFFID, TOTCOVAMT, TOTUNCOVAMT, TOTSERVAMT, PATBILLAMT, PATDISCUNT, PATAMTPAID, PATAMTRCVD, PATCNAMT, PATRFNDAMT, COMBILLAMT, COMDISCUNT, COMAMTPAID, COMAMTRCVD, COMCNAMT, COMRFNDAMT, CREDAUTHBY, DISCAUTHBY, BILLSTAT, DRAWNON, PATCATG, CONSCATG, EMPID, EMPCODE, CLINICCODE, FUNDSOURCE, DEPTCODE, OPCONSNO, OPCONSAMT, OPREGFEE, COMPRCPT, POSTFLAG, NETAMOUNT, AMOUNTPAID, AMOUNTRCVD, CNAMOUNT, RFNDAMOUNT, TOTDISCOUNT, TOTALBILLAMT, ADDR4, ADDR5, CASETYPE, AUTHTRANID, REQUESTNO, CASHCOLL, EXMPTNO, ADVADJAMT, TRANCODE, SCROLLNO, EMERGENCYN, PATPHONE, COMPSTATUS, DISALOWAMT, BILLSOURCE, MATERNYN, EXPDUEDATE, IPNO, WRITOFFAMT, TAXAMT, OTEXPENTYN, TOTSRVTAX, SERVTAXON, SRVTAXAMT, EDUCESAMT, SHECESAMT, DEPTYPE, INSCOMPCD, INTLUPLDYN, ALLWCASHYN, SNCTPRFYN, SNCTPROOF, PISUID, PISPWD, DOCTPOST, LEDGPOST, POSTDATE, CREATED_BY, CREATED_ON, EDITED_BY, EDITED_ON, CANCELDBY, CANCELDON, STATUS, CONSTYPE, WardNo, BedNO, RevisionId, OPDREGNO, DISCCATG, ReferralAgent_ID, @USERID, @USERNAME, @IPAddress, GETDATE() from OPD_BILLMST where medrecno=@MRNO and BILLNO=@BILLNO";
 
-      const params = { USERID: input.USERID, USERNAME: input.USERNAME, IPAddress: input.IPAddress, MRNO: input.MRNO, BILLNO: input.BILLNO };
+      const params = {
+        USERID: input.USERID,
+        USERNAME: input.USERNAME,
+        IPAddress: input.IPAddress,
+        MRNO: input.MRNO,
+        BILLNO: input.BILLNO,
+      };
 
-      const { rowsAffected } = await executeDbQuery(query, params, { transaction });
+      const { rowsAffected } = await executeDbQuery(query, params, {
+        transaction,
+      });
 
       await transaction.commit();
 
       res.json({ status: 0, message: "Success", d: rowsAffected?.[0] ?? 1 });
-
     } catch (err: any) {
       try {
         await transaction.rollback();
       } catch (rollbackErr) {
         res.status(500).json({ status: 1, message: err.message, result: 0 });
       }
-
     }
   }
 
-  async savePatientDetailsWithIPAddress(req: Request, res: Response): Promise<void> {
+  async savePatientDetailsWithIPAddress(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
 
     const pool = await conpool.connect();
@@ -2818,19 +3597,26 @@ export default class consultationController {
     try {
       await transaction.begin();
 
-      const { rowsAffected } = await executeDbQuery("insert into patient_master_audit select *, @USERID @IPAddress, GETDATE(), @USERNAME from patient_master where patientmr_no=@MRNO ", { USERID: input.USERID, IPAddress: input.IPAddress, USERNAME: input.USERNAME, MRNO: input.MRNO }, { transaction });
+      const { rowsAffected } = await executeDbQuery(
+        "insert into patient_master_audit select *, @USERID @IPAddress, GETDATE(), @USERNAME from patient_master where patientmr_no=@MRNO ",
+        {
+          USERID: input.USERID,
+          IPAddress: input.IPAddress,
+          USERNAME: input.USERNAME,
+          MRNO: input.MRNO,
+        },
+        { transaction },
+      );
 
       await transaction.commit();
 
       res.json({ status: 0, message: "Success", d: rowsAffected?.[0] ?? 1 });
-
     } catch (err: any) {
       try {
         await transaction.rollback();
       } catch (rollbackErr) {
         res.status(500).json({ status: 1, message: err.message, result: 0 });
       }
-
     }
   }
 
@@ -2918,6 +3704,4 @@ export default class consultationController {
       res.status(500).json({ status: 1, message: err.message });
     }
   }
-
-
 }
