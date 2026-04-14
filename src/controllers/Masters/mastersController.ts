@@ -399,7 +399,7 @@ export default class mastersController {
         counterId = "OP1";
       }
 
-      const sql = `select HEADERNAME,NANONAME,ADDRESS,MOBILE,EMAIL from mst_cashcounter where CashCounter_Code=@CashCounter_Code and CLNORGCODE=@CLNORGCODE and Status='A'`;
+      const sql = `select HEADERNAME,NANONAME,ADDRESS,MOBILE,EMAIL from mst_cashcounter where CashCounter_Code=@counterId and CLNORGCODE=@hospitalId and Status='A'`;
 
       const params = { counterId, hospitalId };
 
