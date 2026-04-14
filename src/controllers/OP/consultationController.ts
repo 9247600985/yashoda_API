@@ -291,6 +291,11 @@ export default class consultationController {
       this.getSalutations.bind(this),
     );
     this.router.get(
+      "/getCounters",
+      authenticateToken,
+      this.getCounters.bind(this),
+    );
+    this.router.get(
       "/loadDisCategory",
       authenticateToken,
       this.loadDisCategory.bind(this),
@@ -376,6 +381,15 @@ export default class consultationController {
       this.loadDoctorsForConsultation.bind(this),
     );
     
+  }
+  async getCounters(req: Request, res: Response): Promise<void> {
+    const sql = `select CashCounter_Code,CashCounter_Desc,Status from Mst_CashCounter WHERE Status='A' order by CashCounter_Code`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
   }
   async getSalutations(req: Request, res: Response): Promise<void> {
     const sql = `select Sal_Code,Sal_Desc,Status from Mst_Salutation WHERE Status='A' order by Sal_Desc`;
@@ -3652,56 +3666,47 @@ async loadDoctorsForConsultation(req: Request, res: Response): Promise<void> {
     }
   }
 
-  async viewVisits(req: Request, res: Response): Promise<void> {
-    const input = req.method === "GET" ? req.query : req.body;
-    const medRecNo = input.MEDRECNO;
+ async viewVisits(req: Request, res: Response): Promise<void> {
+  const input = req.method === 'GET' ? req.query : req.body;
+  const MEDRECNO = input.MEDRECNO;
 
-    try {
-      // Query matches your C# logic
-      const query = `SELECT C.MEDRECNO,PM.FirstName PATNAME, PM.Patient_Category_Id, C.CONSULTNO, C.OPDBILLNO, C.RECEIPTDATE, D.FIRSTNAME,C.REGFEE,C.CONSFEE, (CASE WHEN C.VISITTYPE='1' THEN 'First Visit' WHEN C.VISITTYPE='2' THEN 'Follow-up Visit' WHEN C.VISITTYPE='3' THEN 'Cross Consultation' WHEN C.VISITTYPE='4' THEN 'Emergency Visit' END) VISITTYPE,C.REGFEE,C.CONSFEE FROM OPD_CONSULTATION C  LEFT JOIN MST_DOCTORMASTER D ON D.CODE=C.DOCTCODE LEFT JOIN PATIENT_MASTER PM ON PM.PATIENTMR_NO=C.MEDRECNO WHERE MEDRECNO=@MEDRECNO ORDER BY RECEIPTDATE`;
-
-      const { records } = await executeDbQuery(query, { medRecNo });
-
-      let sb = `
-      <thead>
-        <tr class='success'>
-          <th style='text-align: left;'>YH No.</th>
-          <th style='text-align: left;'>Patient Name</th>
-          <th style='text-align: left;'>Patient Type</th>
-          <th style='text-align: left;'>Consultation Type</th>
-          <th style='text-align: left;'>Consultation No</th>
-          <th style='text-align: left;'>Consultation Date</th>
-          <th style='text-align: left;'>Consultant Name</th>
-          <th style='text-align: left;'>Bill No.</th>
-          <th style='text-align: right;'>Reg Fee</th>
-          <th style='text-align: right;'>Cons Fee</th>
-        </tr>
-      </thead>
-      <tbody>
+  try {
+    const query = `
+      SELECT 
+        C.MEDRECNO,
+        PM.FirstName AS PATNAME,
+        PM.Patient_Category_Id,
+        C.CONSULTNO,
+        C.OPDBILLNO,
+        C.RECEIPTDATE,
+        D.FIRSTNAME AS DOCTORNAME,
+        C.REGFEE,
+        C.CONSFEE,
+        CASE 
+          WHEN C.VISITTYPE = '1' THEN 'First Visit'
+          WHEN C.VISITTYPE = '2' THEN 'Follow-up Visit'
+          WHEN C.VISITTYPE = '3' THEN 'Cross Consultation'
+          WHEN C.VISITTYPE = '4' THEN 'Emergency Visit'
+          ELSE ''
+        END AS VISITTYPE
+      FROM OPD_CONSULTATION C
+      LEFT JOIN MST_DOCTORMASTER D ON D.CODE = C.DOCTCODE
+      LEFT JOIN PATIENT_MASTER PM ON PM.PATIENTMR_NO = C.MEDRECNO
+      WHERE C.MEDRECNO = @MEDRECNO
+      ORDER BY C.RECEIPTDATE
     `;
 
-      for (const row of records) {
-        sb += `
-        <tr>
-          <td>${row.MEDRECNO ?? ""}</td>
-          <td>${row.PATNAME ?? ""}</td>
-          <td>${row.Patient_Category_Id ?? ""}</td>
-          <td>${row.VISITTYPE ?? ""}</td>
-          <td>${row.CONSULTNO ?? ""}</td>
-          <td>${row.RECEIPTDATE ?? ""}</td>
-          <td>${row.FIRSTNAME ?? ""}</td>
-          <td>${row.OPDBILLNO ?? ""}</td>
-          <td style='text-align: right;'>${row.REGFEE ?? ""}</td>
-          <td style='text-align: right;'>${row.CONSFEE ?? ""}</td>
-        </tr>
-      `;
-      }
+    const result = await executeDbQuery(query, { MEDRECNO });
 
-      sb += "</tbody>";
-
-      res.json({ status: 0, d: sb });
-    } catch (err: any) {
-      res.status(500).json({ status: 1, message: err.message });
-    }
+    res.json({
+      status: 0,
+      result: result.records || [],
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      status: 1,
+      message: err.message,
+    });
   }
+ }
 }
