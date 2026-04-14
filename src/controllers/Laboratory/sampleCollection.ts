@@ -11,14 +11,42 @@ export default class sampleCollectionController {
     this.router.get("/orders", authenticateToken, this.getOrders.bind(this));
     // this.router.get("/tests", authenticateToken, this.getTests.bind(this));
     // this.router.get("/order-details", authenticateToken, this.getOrderDetails.bind(this));
-    this.router.get("/departments", authenticateToken, this.getLabDepartments.bind(this),);
-    this.router.get("/companies", authenticateToken,this.getCompanies.bind(this),);
-    this.router.get("/getSpecimenDropdown", authenticateToken, this.getSpecimenDropdown.bind(this),);
-    this.router.get("/getContainerDropdown", authenticateToken, this.getContainerDropdown.bind(this),);
+    this.router.get(
+      "/departments",
+      authenticateToken,
+      this.getLabDepartments.bind(this),
+    );
+    this.router.get(
+      "/companies",
+      authenticateToken,
+      this.getCompanies.bind(this),
+    );
+    this.router.get(
+      "/getSpecimenDropdown",
+      authenticateToken,
+      this.getSpecimenDropdown.bind(this),
+    );
+    this.router.get(
+      "/getContainerDropdown",
+      authenticateToken,
+      this.getContainerDropdown.bind(this),
+    );
     // this.router.post("/update-status", authenticateToken, this.changeStatus.bind(this));
-    this.router.post("/submitSample", authenticateToken, this.submitSample.bind(this));
-    this.router.get("/getCollectedByDropdown", authenticateToken, this.getCollectedByDropdown.bind(this));
-    this.router.get("/getExternalVendorsDropdown", authenticateToken, this.getExternalVendorsDropdown.bind(this));
+    this.router.post(
+      "/submitSample",
+      authenticateToken,
+      this.submitSample.bind(this),
+    );
+    this.router.get(
+      "/getCollectedByDropdown",
+      authenticateToken,
+      this.getCollectedByDropdown.bind(this),
+    );
+    this.router.get(
+      "/getExternalVendorsDropdown",
+      authenticateToken,
+      this.getExternalVendorsDropdown.bind(this),
+    );
   }
 
   private convertDateFormat(dateStr: string): string {
@@ -240,11 +268,10 @@ AND (
     }
   }
 
-
   // controller/dropdownController.js
-async getSpecimenDropdown(_req: Request, res: Response) {
-  try {
-    const query = `
+  async getSpecimenDropdown(_req: Request, res: Response) {
+    try {
+      const query = `
       SELECT 
         SPECCODE AS SPECIMENID, 
         SPECDESC AS SPECIMENNAME 
@@ -253,24 +280,23 @@ async getSpecimenDropdown(_req: Request, res: Response) {
       ORDER BY SPECDESC
     `;
 
-    const { records } = await executeDbQuery(query);
+      const { records } = await executeDbQuery(query);
 
-    res.json({
-      status: 0,
-      data: records
-    });
-
-  } catch (err: any) {
-    res.status(500).json({
-      status: 1,
-      message: err.message
-    });
+      res.json({
+        status: 0,
+        data: records,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: 1,
+        message: err.message,
+      });
+    }
   }
-}
 
-async getContainerDropdown(_req: Request, res: Response) {
-  try {
-    const query = `
+  async getContainerDropdown(_req: Request, res: Response) {
+    try {
+      const query = `
       SELECT 
         CONTCODE AS CONTAINERID, 
         CONTNAME AS CONTAINERNAME 
@@ -279,26 +305,25 @@ async getContainerDropdown(_req: Request, res: Response) {
       ORDER BY CONTNAME
     `;
 
-    const { records } = await executeDbQuery(query, { status: 'A' });
+      const { records } = await executeDbQuery(query, { status: "A" });
 
-    res.json({
-      status: 0,
-      data: records
-    });
-
-  } catch (err: any) {
-    res.status(500).json({
-      status: 1,
-      message: err.message
-    });
+      res.json({
+        status: 0,
+        data: records,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: 1,
+        message: err.message,
+      });
+    }
   }
-}
 
-async getCollectedByDropdown(req: Request, res: Response) {
-  try {
-    const { hospitalId } = req.query as any;
+  async getCollectedByDropdown(req: Request, res: Response) {
+    try {
+      const { hospitalId } = req.query as any;
 
-    const query = `
+      const query = `
       SELECT 
         USERID AS USERID,
         USERNAME AS USERNAME
@@ -308,29 +333,28 @@ async getCollectedByDropdown(req: Request, res: Response) {
       ORDER BY USERNAME
     `;
 
-    const { records } = await executeDbQuery(query, {
-      role: '004',
-      hospitalId: hospitalId || '',
-    });
+      const { records } = await executeDbQuery(query, {
+        role: "004",
+        hospitalId: hospitalId || "",
+      });
 
-    res.json({
-      status: 0,
-      data: records
-    });
-
-  } catch (err: any) {
-    res.status(500).json({
-      status: 1,
-      message: err.message
-    });
+      res.json({
+        status: 0,
+        data: records,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: 1,
+        message: err.message,
+      });
+    }
   }
-}
 
-async getExternalVendorsDropdown(req: Request, res: Response) {
-  try {
-    const { hospitalId } = req.query as any;
+  async getExternalVendorsDropdown(req: Request, res: Response) {
+    try {
+      const { hospitalId } = req.query as any;
 
-    const query = `
+      const query = `
       SELECT 
         EXTVNDRCODE AS VENDORID,
         EXTVNDRNAME AS VENDORNAME
@@ -339,22 +363,21 @@ async getExternalVendorsDropdown(req: Request, res: Response) {
       ORDER BY EXTVNDRNAME
     `;
 
-    const { records } = await executeDbQuery(query, {
-      hospitalId: hospitalId || ''
-    });
+      const { records } = await executeDbQuery(query, {
+        hospitalId: hospitalId || "",
+      });
 
-    res.json({
-      status: 0,
-      data: records
-    });
-
-  } catch (err: any) {
-    res.status(500).json({
-      status: 1,
-      message: err.message
-    });
+      res.json({
+        status: 0,
+        data: records,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: 1,
+        message: err.message,
+      });
+    }
   }
-}
   // async getTests(req: Request, res: Response) {
   //   try {
   //     const { section, hospitalId, orderNo } = req.query as any;
@@ -434,62 +457,57 @@ async getExternalVendorsDropdown(req: Request, res: Response) {
   //   }
   // }
 
-async submitSample(req: Request, res: Response) {
-  const { selectedTests, collectionInfo } = req.body;
+  async submitSample(req: Request, res: Response) {
+    const { selectedTests, collectionInfo } = req.body;
 
-  if (!selectedTests || selectedTests.length === 0) {
-    return res.status(400).json({ message: "No tests selected" });
-  }
-  const user = (req as any).user;
-  const transaction = new sql.Transaction(conpool);
-  
+    if (!selectedTests || selectedTests.length === 0) {
+      return res.status(400).json({ message: "No tests selected" });
+    }
+    const user = (req as any).user;
+    const transaction = new sql.Transaction(conpool);
 
-  try {
-    await transaction.begin();
+    try {
+      await transaction.begin();
 
-    for (const test of selectedTests) {
-      const result = await executeDbQuery(
-        `UPDATE DGL_ORDERTRN SET 
+      for (const test of selectedTests) {
+        const result = await executeDbQuery(
+          `UPDATE DGL_ORDERTRN SET 
           SAMPLESTATUS = 'SC',
           TESTSTATUS = 'SC',
           SAMLECOLNO = @sampleNo,
           SAMLECOLBY = @collectedBy,
           SAMCOLDATE = @collectedDate,
           SAMCOLTIME = @collectedTime,
-          UPDATEDBY = @userId,
-          UPDATEDON = GETDATE()
-         WHERE ORDERNO = @orderNo 
-           AND TESTCODE = @testCode
-           AND CLNORGCODE = @hospitalId`,
-        {
-          sampleNo: collectionInfo.labCode || '',
-          collectedBy: collectionInfo.collectedBy,
-          collectedDate: collectionInfo.collectedDate ? new Date(collectionInfo.collectedDate) : new Date(),
-          collectedTime: collectionInfo.collectedTime || new Date().toTimeString().split(' ')[0],
-          orderNo: test.ORDERNO,
-          testCode: test.TESTCODE,
-          hospitalId: collectionInfo.hospitalId || "1",
-          userId: user?.id || collectionInfo.collectedBy
-        },
-        { transaction }
-      );
+          CONTCODE = @containerCode 
+          WHERE ORDERNO = @orderNo 
+          AND CLNORGCODE = @hospitalId`,
+          {
+            sampleNo: collectionInfo.labCode || "",
+            collectedBy: collectionInfo.collectedBy,
+            collectedDate: new Date(),
+            collectedTime: new Date().toTimeString().split(" ")[0],
+            containerCode: test.CONTCODE,
+            orderNo: test.ORDERNO,
+            testCode: test.TESTCODE,
+            hospitalId: collectionInfo.hospitalId,
+          },
+        );
 
-      if (result.rowsAffected[0] === 0) {
-        throw new Error(`No rows updated for ${test.ORDERNO}`);
+        if (result.rowsAffected[0] === 0) {
+          throw new Error(`No rows updated for ${test.ORDERNO}`);
+        }
       }
+
+      await transaction.commit();
+
+      res.json({
+        status: 0,
+        message: "Sample collection saved successfully",
+        count: selectedTests.length,
+      });
+    } catch (err: any) {
+      await transaction.rollback();
+      res.status(500).json({ status: 1, message: err.message });
     }
-
-    await transaction.commit();
-
-    res.json({
-      status: 0,
-      message: "Sample collection saved successfully",
-      count: selectedTests.length
-    });
-
-  } catch (err: any) {
-    await transaction.rollback();
-    res.status(500).json({ status: 1, message: err.message });
   }
-}
 }
