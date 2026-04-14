@@ -24,6 +24,8 @@ export default class creditNoteController {
         this.router.post("/saveIPAddress_OPDBILLMST_CN", authenticateToken, this.saveIPAddress_OPDBILLMST.bind(this));
         this.router.get("/getAuthorizedBy", authenticateToken, this.getAuthorizedBy.bind(this));
 this.router.get("/getDiscountCategory", authenticateToken, this.getDiscountCategory.bind(this));
+this.router.get("/getCreditTypes", authenticateToken, this.getCreditTypes.bind(this));
+this.router.get("/getTariffCategories", authenticateToken, this.getTariffCategories.bind(this));
 
     }
 
@@ -261,8 +263,7 @@ this.router.get("/getDiscountCategory", authenticateToken, this.getDiscountCateg
           <th style='text-align:right;'>Age</th>
           <th style='text-align:left;'>Sex</th>
           <th style='text-align:right;'>Credit Note Amount</th>
-          <th style='text-align:left;'>CN.Status</th>
-          <th style='text-align:left;'>RF.Status</th>
+         
           <th style='text-align:left;'>Created By</th>
         </tr>
       </thead>
@@ -273,7 +274,7 @@ this.router.get("/getDiscountCategory", authenticateToken, this.getDiscountCateg
                 const patCnamt = Number(r.PATCNAMT || 0) > 0 ? Number(r.PATCNAMT || 0) : Number(r.COMCNAMT || 0);
 
                 html += `
-        <tr class='success'>
+        <tr class='success' data-billno='${r.OPBILLNO ?? ""}' style='cursor:pointer;'>
           <td style='text-align:left;'>${r.OPCNNO ?? ""}</td>
           <td style='text-align:left;'>${r.OPBILLNO ?? ""}</td>
           <td style='text-align:left;'>${moment(r.BILLDATE).format("DD/MM/YYYY HH:mm") ?? ""}</td> 
@@ -281,11 +282,12 @@ this.router.get("/getDiscountCategory", authenticateToken, this.getDiscountCateg
           <td style='text-align:left;'>${r.Age ?? ""}</td>
           <td style='text-align:left;'>${r.Gender ?? ""}</td>
           <td style='text-align:right;'>${patCnamt.toFixed(2)}</td>
-          <td style='text-align:left;'>${r.cnstatus ?? ""}</td>
-          <td style='text-align:left;'>${r.RFSTATUS ?? ""}</td>
+          
           <td style='text-align:left;'>${r.CREATED_BY ?? ""}</td>
         </tr>
       `;
+    //   <td style='text-align:left;'>${r.cnstatus ?? ""}</td>
+    //       <td style='text-align:left;'>${r.RFSTATUS ?? ""}</td>
                 totCnAmt += patCnamt;
             });
 
@@ -296,7 +298,7 @@ this.router.get("/getDiscountCategory", authenticateToken, this.getDiscountCateg
           <td></td><td></td><td></td><td></td><td></td>
           <td style='text-align:left;'>Total</td>
           <td style='text-align:right;'>(${totCnAmt.toFixed(2)})</td>
-          <td></td><td></td><td>
+          <td>
           </td>
         </tr>
       </tfoot>
@@ -595,5 +597,38 @@ async getDiscountCategory(req: Request, res: Response): Promise<void> {
         res.status(500).json({ status: 1, result: err.message });
     }
 }
-
+async getCreditTypes(req: Request, res: Response): Promise<void> {
+  try {
+    const sqlQuery = `
+      SELECT Credit_Code, Credit_Desc
+      FROM Mst_CreditDebitNote
+      
+    `;
+    const { records } = await executeDbQuery(sqlQuery, {});
+    const list = records.map((r: any) => ({
+      Credit_Code: r.Credit_Code,
+      Credit_Desc: r.Credit_Desc
+    }));
+    res.json({ status: 0, d: list });
+  } catch (err: any) {
+    res.status(500).json({ status: 1, result: err.message });
+  }
+}
+async getTariffCategories(req: Request, res: Response): Promise<void> {
+  try {
+    const sqlQuery = `
+      SELECT TARIFFID, TARIFFDESC
+      FROM MST_TARIFFCATGORY
+      WHERE REC_STATUS = 'A'
+    `;
+    const { records } = await executeDbQuery(sqlQuery, {});
+    const list = records.map((r: any) => ({
+      TARIFFID: r.TARIFFID,
+      TARIFFDESC: r.TARIFFDESC
+    }));
+    res.json({ status: 0, d: list });
+  } catch (err: any) {
+    res.status(500).json({ status: 1, result: err.message });
+  }
+}
 }
