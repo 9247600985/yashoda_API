@@ -28,7 +28,17 @@ export default class consultationController {
 
   constructor(private app: Router) {
     app.use("/op", authenticateToken, this.router);
+this.router.get(
+  "/getHospDataByCounter",
+  authenticateToken,
+  this.getHospDataByCounter.bind(this),
+);
 
+this.router.get(
+  "/getHospData",
+  authenticateToken,
+  this.getHospData.bind(this),
+);
     this.router.get(
       "/Duplicate",
       authenticateToken,
@@ -382,6 +392,94 @@ export default class consultationController {
     );
     
   }
+  async getHospDataByCounter(req: Request, res: Response): Promise<void> {
+  try {
+    const input = req.method === "GET" ? req.query : req.body;
+
+    let counterId = String(input.counterId || "").trim();
+    const hospitalId = String(input.HospitalId || "").trim();
+
+    if (!counterId) {
+      counterId = "OP1";
+    }
+
+    if (!hospitalId) {
+      res.status(400).json({ status: 1, result: "HospitalId is required" });
+      return;
+    }
+
+    const query = `
+      SELECT
+        HEADERNAME,
+        NANONAME,
+        ADDRESS,
+        MOBILE,
+        EMAIL
+      FROM mst_cashcounter
+      WHERE CashCounter_Code = @counterId
+        AND CLNORGCODE = @hospitalId
+        AND Status = 'A'
+    `;
+
+    const params = {
+      counterId,
+      hospitalId,
+    };
+
+    const { records } = await executeDbQuery(query, params);
+
+    const result = (records || []).map((row: any) => ({
+      HospitalName: row.HEADERNAME || "",
+      Phone_No: row.MOBILE || "",
+      EMail: row.EMAIL || "",
+      NanoName: row.NANONAME || "",
+      address1: row.ADDRESS || "",
+    }));
+
+    res.json({ status: 0, result });
+  } catch (err: any) {
+    res.status(500).json({ status: 1, result: err.message });
+  }
+}
+
+async getHospData(req: Request, res: Response): Promise<void> {
+  try {
+    const input = req.method === "GET" ? req.query : req.body;
+    const hospitalId = String(input.HospitalId || "").trim();
+
+    if (!hospitalId) {
+      res.status(400).json({ status: 1, result: "HospitalId is required" });
+      return;
+    }
+
+    const query = `EXEC sp_getHospitalId @hospitalId`;
+
+    const params = {
+      hospitalId,
+    };
+
+    const { records } = await executeDbQuery(query, params);
+
+    const result = (records || []).map((row: any) => ({
+      Hospital_Id: row.Hospital_Id || "",
+      HospitalName: row.HospitalName || "",
+      address1: row.address1 || "",
+      address2: row.address2 || "",
+      address3: row.address3 || "",
+      Phone_No: row.Phone_No || "",
+      EMail: row.EMail || "",
+      Website: row.Website || "",
+      Photo: row.photo || "",
+      NanoName: row.NanoName || "",
+      GstNo: row.GSTNO || "",
+      DlNo: row.DLNO || "",
+    }));
+
+    res.json({ status: 0, result });
+  } catch (err: any) {
+    res.status(500).json({ status: 1, result: err.message });
+  }
+}
   async getCounters(req: Request, res: Response): Promise<void> {
     const sql = `select CashCounter_Code,CashCounter_Desc,Status from Mst_CashCounter WHERE Status='A' order by CashCounter_Code`;
     try {
