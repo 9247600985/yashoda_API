@@ -22,8 +22,63 @@ export default class reportsController {
     this.router.get("/OPCollectionReportD", authenticateToken, this.SHOW_DETAILS_REPORT.bind(this));
     this.router.get("/OPCollectionReportP", authenticateToken, this.SOW_PAYMODE_SUMMARY.bind(this));
     this.router.get("/UserWiseCollectionReport", authenticateToken, this.GET_DETAILS.bind(this));
+    this.router.get("/bindUsers", authenticateToken, this.bindUsers.bind(this));
+      this.router.get("/getonlyDoctors", authenticateToken, this.getonlyDoctors.bind(this));
+        this.router.get("/loadClinics", authenticateToken, this.loadClinics.bind(this));
+    
+  }
+  async loadClinics(req: Request, res: Response): Promise<void> {
+    const sql = `select CLINIC_CODE,CLINIC_NAME,Status from TM_CLINICS WHERE Status='A' order by CLINIC_NAME`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
   }
 
+
+  async getonlyDoctors(req: Request, res: Response): Promise<void> {
+    const sql = `select Code,Firstname,Status from Mst_DoctorMaster WHERE Status='A' order by Firstname`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+async bindUsers(req: Request, res: Response): Promise<void> {
+  try {
+    const input = req.method === 'GET' ? req.query : req.body;
+    const clinicId = input.hospitalId || input.CLINICID || input.clinicId || '';
+
+    const sql = `
+      SELECT 
+        UC.USERID,
+        UM.USERNAME
+      FROM MST_USERDETAILS UM
+      INNER JOIN MST_CLINICTOUSERLINK UC
+        ON UC.USERID = UM.USERID
+      WHERE UC.CLINICID = @CLINICID
+      ORDER BY UM.USERNAME
+    `;
+
+    const { records } = await executeDbQuery(sql, {
+      CLINICID: clinicId,
+    });
+
+    res.json({
+      status: 0,
+      result: records || [],
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      status: 1,
+      result: err.message,
+    });
+  }
+}
   async AccountReport(req: Request, res: Response): Promise<void> {
     const input = req.method === 'GET' ? req.query : req.body;
     let sql = '';

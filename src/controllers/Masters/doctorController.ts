@@ -32,10 +32,9 @@ export default class doctorController {
      this.router.get("/getDoctorFile", authenticateToken, this.getDoctorFile.bind(this));
      this.router.get("/getRefHospitals", authenticateToken, this.getRefHospitals.bind(this));
      this.router.get("/getNextDoctorCode", authenticateToken, this.getNextDoctorCode.bind(this));
+    
   }
-
-
-
+ 
   async getNextDoctorCode(req: Request, res: Response): Promise<void> {
   try {
     const data = await executeDbQuery(`SELECT ISNULL(MAX(Code),0) AS Code FROM Mst_DoctorMaster`);
