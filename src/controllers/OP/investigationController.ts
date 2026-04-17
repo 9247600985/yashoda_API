@@ -261,14 +261,14 @@ export default class investigationController {
   }
 
   async getServicesInfoJson(req: Request, res: Response): Promise<void> {
-    const input = req.method === 'GET' ? req.query : req.body;
-    const SERVCODE     = input.serviceCode   || '';
-    const CLNORGCODE   = input.hospid        || '';
-    const TARIFFID     = input.tariffId      || '';
-    const BEDCATGCODE  = input.bedCategoryId || '';
-    const patientType  = input.patientType   || 'OP';
+    const input = req.method === "GET" ? req.query : req.body;
+    const SERVCODE = input.serviceCode || "";
+    const CLNORGCODE = input.hospid || "";
+    const TARIFFID = input.tariffId || "";
+    const BEDCATGCODE = input.bedCategoryId || "";
+    const patientType = input.patientType || "OP";
 
-    let query = '';
+    let query = "";
     const base = `SELECT d.DEPTNAME, M.SERVCODE, M.SERVNAME, MS.SERVICECOST, MS.DOCTSHAREAMT,
         M.DOC_COMP, M.RATEEDIT, M.DEPTCODE, M.NAMEEDIT, M.QTY_EDITABLE,
         M.IsDiscountAlwd, M.MaxDiscountPer, M.SERVTYPECD, M.SRVGRPCODE, M.SRVSUBGRP
@@ -278,30 +278,34 @@ export default class investigationController {
         WHERE M.STATUS = 'A'
         AND (M.SERVCODE LIKE '%${SERVCODE}%' OR M.SERVNAME LIKE '%${SERVCODE}%' OR M.MNEUNONIC LIKE '%${SERVCODE}%')`;
 
-    if (patientType === 'IP') {
-      query = base + ` AND MS.TARIFFID='${TARIFFID}' AND MS.BEDCATGCODE='${BEDCATGCODE}' AND MS.CLNORGCODE='${CLNORGCODE}' ORDER BY M.SERVNAME`;
+    if (patientType === "IP") {
+      query =
+        base +
+        ` AND MS.TARIFFID='${TARIFFID}' AND MS.BEDCATGCODE='${BEDCATGCODE}' AND MS.CLNORGCODE='${CLNORGCODE}' ORDER BY M.SERVNAME`;
     } else {
-      query = base + ` AND MS.TARIFFID='001' AND MS.BEDCATGCODE IN (SELECT OpBedCatId FROM Mst_FacilitySetup) AND MS.CLNORGCODE='${CLNORGCODE}' ORDER BY M.SERVNAME`;
+      query =
+        base +
+        ` AND MS.TARIFFID='001' AND MS.BEDCATGCODE IN (SELECT OpBedCatId FROM Mst_FacilitySetup) AND MS.CLNORGCODE='${CLNORGCODE}' ORDER BY M.SERVNAME`;
     }
 
     try {
       const result = await executeDbQuery(query, []);
       const data = (result.records || []).map((r: any) => ({
-        SERVCODE:       r.SERVCODE        || '',
-        SERVNAME:       r.SERVNAME        || '',
-        RATE:           r.SERVICECOST     || 0,
-        DOCTSHAREAMT:   r.DOCTSHAREAMT    || 0,
-        DOC_COMP:       r.DOC_COMP        || '',
-        RATEEDIT:       r.RATEEDIT        || '',
-        NAMEEDIT:       r.NAMEEDIT        || '',
-        QTY_EDITABLE:   r.QTY_EDITABLE    || '',
-        IsDiscountAlwd: r.IsDiscountAlwd  || '',
-        MaxDiscountPer: r.MaxDiscountPer  || 0,
-        SERVTYPECD:     r.SERVTYPECD      || '',
-        SRVGRPCODE:     r.SRVGRPCODE      || '',
-        SRVSUBGRP:      r.SRVSUBGRP       || '',
-        DEPTCODE:       r.DEPTCODE        || '',
-        DEPTNAME:       r.DEPTNAME        || '',
+        SERVCODE: r.SERVCODE || "",
+        SERVNAME: r.SERVNAME || "",
+        RATE: r.SERVICECOST || 0,
+        DOCTSHAREAMT: r.DOCTSHAREAMT || 0,
+        DOC_COMP: r.DOC_COMP || "",
+        RATEEDIT: r.RATEEDIT || "",
+        NAMEEDIT: r.NAMEEDIT || "",
+        QTY_EDITABLE: r.QTY_EDITABLE || "",
+        IsDiscountAlwd: r.IsDiscountAlwd || "",
+        MaxDiscountPer: r.MaxDiscountPer || 0,
+        SERVTYPECD: r.SERVTYPECD || "",
+        SRVGRPCODE: r.SRVGRPCODE || "",
+        SRVSUBGRP: r.SRVSUBGRP || "",
+        DEPTCODE: r.DEPTCODE || "",
+        DEPTNAME: r.DEPTNAME || "",
       }));
       res.json({ status: 0, d: data });
     } catch (err: any) {
@@ -796,6 +800,9 @@ export default class investigationController {
 
   async saveInvestigation(req: Request, res: Response): Promise<void> {
     const input = req.body.invData;
+    console.log("saveInvestigation req.body:", req.body);
+    console.log("saveInvestigation invData:", req.body.invData);
+    console.log("saveInvestigation billTrnRows:", req.body.billTrnRows);
     const transaction = new sql.Transaction(conpool);
     let Insert_OPD_BILLMST = "",
       Insert_OPD_Receipts = "",
@@ -1162,11 +1169,20 @@ export default class investigationController {
             Amb_Adate: input.Amb_Adate || "",
           };
 
-          const { rowsAffected } = await executeDbQuery(
-            Insert_YH_AMBULANCE_DETAILS,
-            Insert_YH_AMBULANCE_DETAILS_params,
-            { transaction },
-          );
+          console.log("Saving OPD_BILLTRN row:", row);
+          console.log("Insert_OPD_BILLTRN_params:", Insert_OPD_BILLTRN_params);
+
+          try {
+            const { rowsAffected } = await executeDbQuery(
+              Insert_OPD_BILLTRN,
+              Insert_OPD_BILLTRN_params,
+              { transaction },
+            );
+          } catch (err: any) {
+            console.error("OPD_BILLTRN insert failed for row:", row);
+            console.error("Failed params:", Insert_OPD_BILLTRN_params);
+            throw err;
+          }
         }
 
         if (row.ServType == "04") {
