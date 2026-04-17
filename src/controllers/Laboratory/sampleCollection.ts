@@ -1,512 +1,418 @@
 import express, { Request, Response, Router } from "express";
+import sql from "mssql";
+
 import { conpool, executeDbQuery } from "../../db";
 import { authenticateToken } from "../../utilities/authMiddleWare";
-import sql from "mssql";
 
 export default class sampleCollectionController {
   private router: Router = express.Router();
 
-  constructor(app: Router) {
+  constructor(private app: Router) {
     app.use("/lab", this.router);
-    this.router.get("/orders", authenticateToken, this.getOrders.bind(this));
-    // this.router.get("/tests", authenticateToken, this.getTests.bind(this));
-    // this.router.get("/order-details", authenticateToken, this.getOrderDetails.bind(this));
+
+    this.router.get("/clickShow", authenticateToken, this.showData.bind(this));
     this.router.get(
-      "/departments",
+      "/tbl_OrdersListDetails",
+      authenticateToken,
+      this.showTest.bind(this),
+    );
+    this.router.get(
+      "/DispalyData",
+      authenticateToken,
+      this.getDetails.bind(this),
+    );
+    this.router.post(
+      "/updateDataList",
+      authenticateToken,
+      this.changeStatus.bind(this),
+    );
+    this.router.post(
+      "/clickUpdate",
+      authenticateToken,
+      this.updateDGLORDERTRN.bind(this),
+    );
+    this.router.get(
+      "/getLabDepartments",
       authenticateToken,
       this.getLabDepartments.bind(this),
     );
     this.router.get(
-      "/companies",
+      "/getCompanies",
       authenticateToken,
       this.getCompanies.bind(this),
     );
     this.router.get(
-      "/getSpecimenDropdown",
+      "/getExternalVendors",
       authenticateToken,
-      this.getSpecimenDropdown.bind(this),
+      this.getExternalVendors.bind(this),
     );
     this.router.get(
-      "/getContainerDropdown",
+      "/getSpecimens",
       authenticateToken,
-      this.getContainerDropdown.bind(this),
-    );
-    // this.router.post("/update-status", authenticateToken, this.changeStatus.bind(this));
-    this.router.post(
-      "/submitSample",
-      authenticateToken,
-      this.submitSample.bind(this),
+      this.getSpecimens.bind(this),
     );
     this.router.get(
-      "/getCollectedByDropdown",
+      "/getContainers",
       authenticateToken,
-      this.getCollectedByDropdown.bind(this),
+      this.getContainers.bind(this),
     );
     this.router.get(
-      "/getExternalVendorsDropdown",
+      "/getCollectedByUsers",
       authenticateToken,
-      this.getExternalVendorsDropdown.bind(this),
+      this.getCollectedByUsers.bind(this),
     );
   }
 
-  private convertDateFormat(dateStr: string): string {
-    if (!dateStr || /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-
-    if (/^\d{2}-[A-Za-z]{3}-\d{4}$/.test(dateStr)) {
-      const months: { [key: string]: string } = {
-        Jan: "01",
-        Feb: "02",
-        Mar: "03",
-        Apr: "04",
-        May: "05",
-        Jun: "06",
-        Jul: "07",
-        Aug: "08",
-        Sep: "09",
-        Oct: "10",
-        Nov: "11",
-        Dec: "12",
-      };
-      const [day, month, year] = dateStr.split("-");
-      return `${year}-${months[month]}-${day}`;
-    }
-    return dateStr;
-  }
-
-  async getLabDepartments(_req: Request, res: Response) {
+  async getExternalVendors(req: Request, res: Response): Promise<void> {
     try {
-      const query = `SELECT LABDPTCODE, LABDPTDESC FROM DGL_LABDEPT WHERE LABTYPE = '01' ORDER BY LABDPTDESC`;
-      const { records } = await executeDbQuery(query);
-      res.json({ status: 0, data: records });
+      const hospitalId = String(req.query.hospitalId || "");
+
+      const sqlQuery = `
+      SELECT
+        EXTVNDRCODE AS id,
+        EXTVNDRNAME AS name
+      FROM DGL_EXTVENDORMST
+      WHERE CLNORGCODE = @hospitalId
+      ORDER BY EXTVNDRNAME
+    `;
+
+      const { records } = await executeDbQuery(sqlQuery, { hospitalId });
+      res.json({ status: 0, d: records });
     } catch (err: any) {
       res.status(500).json({ status: 1, message: err.message });
     }
   }
 
-  async getCompanies(_req: Request, res: Response) {
+  async getSpecimens(req: Request, res: Response): Promise<void> {
     try {
-      const query = `SELECT Com_Id AS COMPANYID, Name AS COMPANYNAME FROM Company WHERE Status = 'A' AND CompanyType = '002' ORDER BY Name`;
-      const { records } = await executeDbQuery(query);
-      res.json({ status: 0, data: records });
+      const sqlQuery = `
+      SELECT
+        SPECCODE AS id,
+        SPECDESC AS name
+      FROM DGL_SPECIMENMAST
+      WHERE STATUS = 'A'
+      ORDER BY SPECDESC
+    `;
+
+      const { records } = await executeDbQuery(sqlQuery);
+      res.json({ status: 0, d: records });
     } catch (err: any) {
       res.status(500).json({ status: 1, message: err.message });
     }
   }
 
-  async getOrders(req: Request, res: Response) {
-    const { orderNo } = req.query as any;
-
-    // ================= TEST MODE =================
-    if (orderNo) {
-      const testQuery = `
-    SELECT 
-      ot.ORDERNO,
-      ot.TESTCODE,
-      tm.TESTNAME AS TESTDESC,
-      ld.LABDPTDESC AS LABORATORY,
-      sm.SPECDESC AS SPECIMEN,
-      cm.CONTNAME AS CONTAINER,
-      ot.SAMLECOLNO AS SAMPLENUMBER,
-      ISNULL(CONVERT(VARCHAR(11), ot.SAMCOLDATE, 106), '') AS COLLECTEDDATE,
-      ISNULL(CONVERT(VARCHAR(8), ot.SAMCOLTIME, 108), '') AS COLLECTEDTIME,
-      ot.SAMLECOLBY AS COLLECTEDBY
-    FROM DGL_ORDERTRN ot
-    INNER JOIN DGL_TESTMASTER tm ON ot.TESTCODE = tm.TESTCODE
-    INNER JOIN DGL_LABDEPT ld ON tm.LABDPTCODE = ld.LABDPTCODE
-    LEFT JOIN DGL_SPECIMENMAST sm ON tm.SPECCODE = sm.SPECCODE 
-    LEFT JOIN DGL_CONTAINERMAST cm ON tm.CONTCODE = cm.CONTCODE
-    WHERE ot.ORDERNO = @orderNo
-    ORDER BY ot.SEQNO
-  `;
-
-      const { records } = await executeDbQuery(testQuery, { orderNo });
-
-      res.json({
-        status: 0,
-        data: records,
-      });
-      return;
-    }
+  async getContainers(req: Request, res: Response): Promise<void> {
     try {
-      const {
-        fromDate,
-        toDate,
-        section,
-        priority,
+      const sqlQuery = `
+      SELECT
+        CONTCODE AS id,
+        CONTNAME AS name
+      FROM DGL_ContainerMAST
+      WHERE STATUS = 'A'
+      ORDER BY CONTNAME
+    `;
+
+      const { records } = await executeDbQuery(sqlQuery);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async getCollectedByUsers(req: Request, res: Response): Promise<void> {
+    try {
+      const hospitalId = String(req.query.hospitalId || "");
+
+      const sqlQuery = `
+      SELECT
+        USERID AS id,
+        USERNAME AS name
+      FROM Mst_UserDetails
+      WHERE ROLES = '004'
+        AND CLNORGCODE = @hospitalId
+      ORDER BY USERNAME
+    `;
+
+      const { records } = await executeDbQuery(sqlQuery, { hospitalId });
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+  async getCompanies(req: Request, res: Response): Promise<void> {
+    try {
+      const sqlQuery = `
+        SELECT Com_Id AS id, NAME AS name
+        FROM Company
+        WHERE STATUS = 'A'
+          AND CompanyType = '002'
+        ORDER BY NAME
+      `;
+
+      const { records } = await executeDbQuery(sqlQuery);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async getLabDepartments(req: Request, res: Response): Promise<void> {
+    try {
+      const hospitalId = String(req.query.hospitalId || "");
+      const labType = String(req.query.labType || "");
+
+      const sqlQuery = `
+      SELECT LABDPTCODE AS id, LABDPTDESC AS name
+      FROM DGL_LABDEPT
+      WHERE STATUS = 'A'
+        AND LABTYPE = @labType
+        AND CLNORGCODE = @hospitalId
+      ORDER BY LABDPTDESC
+    `;
+
+      const { records } = await executeDbQuery(sqlQuery, {
         hospitalId,
-        sampleStatus,
-        patientType,
-        companyId,
-      } = req.query as any;
+        labType,
+      });
 
-      const params: any = {
-        fromDate: this.convertDateFormat(fromDate) + " 00:00:00",
-        toDate: this.convertDateFormat(toDate) + " 23:59:59",
-        section: section || "",
-        priority: priority || "A",
-        hospitalId: hospitalId || "",
-        sampleStatus: sampleStatus || "A",
-        patientType: patientType || "A",
-        companyId: companyId || "",
-      };
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
 
-      // ================= BASE =================
-      const baseQuery = `
-      SELECT DISTINCT 
-        om.sex,
+  async showData(req: Request, res: Response): Promise<void> {
+    const input = req.body || req.query;
+
+    const dtFm = input.Fromdate;
+    const dtTo = input.ToDate;
+    const SectionID = input.SectionID || "";
+    const Priority = input.Priority || "";
+    const Company_Id = input.Company_Id || "";
+    const CLNORGCODE = input.hospitalId || "";
+    const Patient_type = input.Patient_type || "All";
+    const SampleStatus = input.SampleStatus || "All";
+
+    try {
+      let sqlQuery = `
+      SELECT DISTINCT
         om.ORDERNO,
         CONVERT(VARCHAR(11), om.ORDERDATE, 106) AS ORDERDATE,
         CONVERT(VARCHAR(8), om.ORDERTIME, 108) AS ORDERTIME,
         om.MEDRECNO,
         om.IPNO,
         om.PATNAME,
-        ot.TESTSTATUS AS SAMPLESTATUS,
+        ot.SAMPLESTATUS,
         om.PRIORITY,
-        om.WARDNO,
         om.AGE,
-        dm.Firstname,
+        dt.Firstname,
         pm.Mobile
       FROM DGL_ORDERMST om
       INNER JOIN DGL_ORDERTRN ot ON om.ORDERNO = ot.ORDERNO
       LEFT JOIN Patient_Master pm ON pm.PatientMr_No = om.MEDRECNO
-      LEFT JOIN Mst_DoctorMaster dm ON dm.Code = om.ORDEREDBY
+      LEFT JOIN Mst_DoctorMaster dt ON dt.Code = om.ORDEREDBY
+      INNER JOIN OPD_BILLMST ob ON ob.BILLNO = om.BILLNO
+      WHERE om.ORDERDATE >= @dtFm
+        AND om.ORDERDATE <= @dtTo
+        AND om.STATUS = 'A'
+        AND om.PRIORITY LIKE @Priority
+        AND om.ORDER_STATUS <> 'OR'
+        AND om.LABTYPECD = '01'
+        AND om.CLNORGCODE = @CLNORGCODE
+        AND ob.CRDCOMPCD LIKE @CompanyId
     `;
 
-      // ================= CONDITIONS =================
-      let conditions = `
-      WHERE om.ORDERDATE BETWEEN @fromDate AND @toDate
-      AND om.STATUS = 'A'
-      AND om.ORDER_STATUS <> 'OR'
-      AND (@hospitalId = '' OR om.CLNORGCODE = @hospitalId)    `;
+      const params: any = {
+        dtFm: `${dtFm} 00:00:00`,
+        dtTo: `${dtTo} 23:59:59`,
+        Priority:
+          Priority === "A" || Priority === "" || Priority === "All"
+            ? "%%"
+            : `%${Priority}%`,
+        CLNORGCODE,
+        CompanyId:
+          Company_Id === "" || Company_Id === "All" ? "%%" : `%${Company_Id}%`,
+      };
 
-      // Sample Status
-      if (
-        params.sampleStatus &&
-        params.sampleStatus !== "A" &&
-        params.sampleStatus !== "C"
-      ) {
-        const statuses = params.sampleStatus
-          .replace(/'/g, "")
-          .split(",")
-          .map((s: string) => s.trim())
-          .filter((s: string) => s);
+      if (SectionID && SectionID !== "All") {
+        sqlQuery += ` AND ot.LABDPTCODE = @SectionID`;
+        params.SectionID = SectionID;
+      }
 
-        if (statuses.length > 0) {
-          const statusParams = statuses
-            .map((_: any, i: any) => `@status${i}`)
-            .join(",");
-          conditions += ` AND ot.TESTSTATUS IN (${statusParams})`;
+      if (Patient_type && Patient_type !== "All") {
+        let mappedPatientType = Patient_type;
 
-          statuses.forEach((val: string, i: number) => {
-            params[`status${i}`] = val;
-          });
+        if (Patient_type === "OP") mappedPatientType = "O";
+        if (Patient_type === "IP") mappedPatientType = "I";
+        if (Patient_type === "D") mappedPatientType = "D";
+
+        sqlQuery += ` AND om.ORDERTYPE = @PatientType`;
+        params.PatientType = mappedPatientType;
+      }
+
+      if (SampleStatus && SampleStatus !== "All") {
+        if (SampleStatus === "Pending") {
+          sqlQuery += ` AND ot.SAMPLESTATUS IN ('OP')`;
+        } else if (SampleStatus === "Collected") {
+          sqlQuery += ` AND ot.SAMPLESTATUS IN ('SC', 'SA', 'C')`;
         }
       }
 
-      // Patient Type
-      if (params.patientType !== "A") {
-        conditions += ` AND om.PATTYPE LIKE @patientType + '%'`;
+      sqlQuery += ` ORDER BY om.ORDERNO DESC`;
+
+      const { records } = await executeDbQuery(sqlQuery, params);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async showTest(req: Request, res: Response): Promise<void> {
+    const input = req.body || req.query;
+
+    const OrderNo = input.Order_No || "";
+    const DEPT = input.DEPT || "";
+    const CLNORGCODE = input.hospitalId || "";
+
+    try {
+      let sqlQuery = `
+        SELECT
+          om.ORDERNO,
+          ot.TESTCODE,
+          tm.TESTNAME,
+          ld.LABDPTDESC,
+          sm.SPECDESC,
+          cm.CONTNAME,
+          ot.SAMLECOLNO,
+          ot.SAMPLESTATUS,
+          ot.COLLECTEDBY,
+          ot.SAMLECOLBY
+        FROM DGL_ORDERMST om
+        INNER JOIN DGL_ORDERTRN ot ON om.ORDERNO = ot.ORDERNO
+        INNER JOIN DGL_TESTMASTER tm ON ot.TESTCODE = tm.TESTCODE
+        INNER JOIN DGL_LABDEPT ld ON tm.LABDPTCODE = ld.LABDPTCODE
+        LEFT JOIN DGL_SPECIMENMAST sm ON tm.SPECCODE = sm.SPECCODE
+        LEFT JOIN DGL_ContainerMAST cm ON tm.CONTCODE = cm.CONTCODE
+        WHERE om.ORDERNO = @OrderNo
+          AND om.CLNORGCODE = @CLNORGCODE
+      `;
+
+      const params: any = {
+        OrderNo,
+        CLNORGCODE,
+      };
+
+      if (DEPT) {
+        sqlQuery += ` AND ot.LABDPTCODE = @DEPT`;
+        params.DEPT = DEPT;
       }
 
-      // Priority
-      if (params.priority !== "A") {
-        conditions += ` AND om.PRIORITY LIKE @priority + '%'`;
-      }
+      sqlQuery += ` ORDER BY ot.TESTCODE`;
 
-      // Section
-      if (params.section) {
-        conditions += ` AND (@section = '' OR LTRIM(RTRIM(ot.LABDPTCODE)) = LTRIM(RTRIM(@section)))`;
-      }
-
-      // ================= OP QUERY =================
-      const opQuery = `
-       ${baseQuery}
-       LEFT JOIN OPD_BILLMST OB ON OB.BILLNO = OM.BILLNO
-       ${conditions}
-AND (
-  @companyId LIKE '' 
-  OR (
-    OB.CRDCOMPCD IS NOT NULL 
-    AND OB.CRDCOMPCD <> '' 
-    AND OB.CRDCOMPCD LIKE @companyId + '%'
-  )
-)`;
-
-      // ================= IP QUERY =================
-      const ipQuery = `
-      ${baseQuery}
-      LEFT JOIN IPD_ADMISSION IA ON IA.IPNO = OM.IPNO
-      ${conditions}
-AND (
-  @companyId LIKE '' 
-  OR (
-    IA.CRDCOMPCD IS NOT NULL 
-    AND IA.CRDCOMPCD <> '' 
-    AND IA.CRDCOMPCD LIKE @companyId + '%'
-  )
-)`;
-
-      // ================= FINAL =================
-      const finalQuery = `
-      ${opQuery}
-      UNION ALL
-      ${ipQuery}
-      ORDER BY ORDERDATE DESC, ORDERTIME DESC
-    `;
-
-      const { records } = await executeDbQuery(finalQuery, params);
-
-      res.json({
-        status: 0,
-        data: records,
-      });
+      const { records } = await executeDbQuery(sqlQuery, params);
+      res.json({ status: 0, d: records });
     } catch (err: any) {
-      res.status(500).json({
-        status: 1,
-        message: err.message,
-      });
+      res.status(500).json({ status: 1, message: err.message });
     }
   }
 
-  // controller/dropdownController.js
-  async getSpecimenDropdown(_req: Request, res: Response) {
-    try {
-      const query = `
-      SELECT 
-        SPECCODE AS SPECIMENID, 
-        SPECDESC AS SPECIMENNAME 
-      FROM DGL_SPECIMENMAST 
-      WHERE STATUS = 'A' 
-      ORDER BY SPECDESC
-    `;
-
-      const { records } = await executeDbQuery(query);
-
-      res.json({
-        status: 0,
-        data: records,
-      });
-    } catch (err: any) {
-      res.status(500).json({
-        status: 1,
-        message: err.message,
-      });
-    }
-  }
-
-  async getContainerDropdown(_req: Request, res: Response) {
-    try {
-      const query = `
-      SELECT 
-        CONTCODE AS CONTAINERID, 
-        CONTNAME AS CONTAINERNAME 
-      FROM DGL_CONTAINERMAST 
-      WHERE STATUS = @status 
-      ORDER BY CONTNAME
-    `;
-
-      const { records } = await executeDbQuery(query, { status: "A" });
-
-      res.json({
-        status: 0,
-        data: records,
-      });
-    } catch (err: any) {
-      res.status(500).json({
-        status: 1,
-        message: err.message,
-      });
-    }
-  }
-
-  async getCollectedByDropdown(req: Request, res: Response) {
-    try {
-      const { hospitalId } = req.query as any;
-
-      const query = `
-      SELECT 
-        USERID AS USERID,
-        USERNAME AS USERNAME
-      FROM Mst_UserDetails
-      WHERE ROLES = @role
-        AND (@hospitalId = '' OR CLNORGCODE = @hospitalId)
-      ORDER BY USERNAME
-    `;
-
-      const { records } = await executeDbQuery(query, {
-        role: "004",
-        hospitalId: hospitalId || "",
-      });
-
-      res.json({
-        status: 0,
-        data: records,
-      });
-    } catch (err: any) {
-      res.status(500).json({
-        status: 1,
-        message: err.message,
-      });
-    }
-  }
-
-  async getExternalVendorsDropdown(req: Request, res: Response) {
-    try {
-      const { hospitalId } = req.query as any;
-
-      const query = `
-      SELECT 
-        EXTVNDRCODE AS VENDORID,
-        EXTVNDRNAME AS VENDORNAME
-      FROM DGL_EXTVENDORMST
-      WHERE (@hospitalId = '' OR CLNORGCODE = @hospitalId)
-      ORDER BY EXTVNDRNAME
-    `;
-
-      const { records } = await executeDbQuery(query, {
-        hospitalId: hospitalId || "",
-      });
-
-      res.json({
-        status: 0,
-        data: records,
-      });
-    } catch (err: any) {
-      res.status(500).json({
-        status: 1,
-        message: err.message,
-      });
-    }
-  }
-  // async getTests(req: Request, res: Response) {
-  //   try {
-  //     const { section, hospitalId, orderNo } = req.query as any;
-
-  //     const params = {
-  //       hospitalId: hospitalId || "1",
-  //       section: section || "",
-  //       orderNo: orderNo,
-  //     };
-
-  //     const query = `
-  //       SELECT ot.ORDERNO, ot.TESTCODE, tm.TESTNAME as TESTDESC, ld.LABDPTDESC as LABORATORY,
-  //         sm.SPECDESC as SPECIMEN, cm.CONTNAME as CONTAINER, ot.SAMLECOLNO as SAMPLENUMBER,
-  //         ISNULL(CONVERT(VARCHAR(11), ot.SAMCOLDATE, 106), '') as COLLECTEDDATE,
-  //         ISNULL(CONVERT(VARCHAR(8), ot.SAMCOLTIME, 108), '') as COLLECTEDTIME,
-  //         ot.SAMLECOLBY as COLLECTEDBY, ot.SEQNO
-  //       FROM DGL_ORDERTRN ot
-  //       INNER JOIN DGL_TESTMASTER tm ON ot.TESTCODE = tm.TESTCODE
-  //       INNER JOIN DGL_LABDEPT ld ON tm.LABDPTCODE = ld.LABDPTCODE
-  //       LEFT JOIN DGL_SPECIMENMAST sm ON tm.SPECCODE = sm.SPECCODE
-  //       LEFT JOIN DGL_ContainerMAST cm ON tm.CONTCODE = cm.CONTCODE
-  //       WHERE ot.ORDERNO LIKE @orderNo + '%' AND ot.CLNORGCODE LIKE @hospitalId + '%'
-  //         AND (LEN(@section) = 0 OR ot.LABDPTCODE LIKE @section + '%')
-  //       ORDER BY ot.SEQNO`;
-
-  //     const { records } = await executeDbQuery(query, params);
-  //     res.json({ status: 0, data: records });
-  //   } catch (err: any) {
-  //     res.status(500).json({ status: 1, message: err.message });
-  //   }
-  // }
-
-  // async getOrderDetails(req: Request, res: Response) {
-  //   try {
-  //     const { orderNo, hospitalId } = req.query;
-
-  //     const query = `
-  //       SELECT ot.ORDERNO, ot.TESTCODE, tm.TESTNAME, ld.LABDPTDESC, sm.SPECDESC,
-  //         cm.CONTNAME, ot.SAMLECOLNO, ot.SAMLECOLBY, ot.TESTSTATUS, ot.SAMPLESTATUS
-  //       FROM DGL_ORDERTRN ot
-  //       INNER JOIN DGL_TESTMASTER tm ON ot.TESTCODE = tm.TESTCODE
-  //       INNER JOIN DGL_LABDEPT ld ON tm.LABDPTCODE = ld.LABDPTCODE
-  //       LEFT JOIN DGL_SPECIMENMAST sm ON tm.SPECCODE = sm.SPECCODE
-  //       LEFT JOIN DGL_CONTAINERMAST cm ON tm.CONTCODE = cm.CONTCODE
-  //       WHERE ot.ORDERNO = @orderNo AND ot.CLNORGCODE = @hospitalId`;
-
-  //     const { records } = await executeDbQuery(query, {
-  //       orderNo: orderNo as string,
-  //       hospitalId: (hospitalId as string) || "1"
-  //     });
-  //     res.json({ status: 0, data: records });
-  //   } catch (err: any) {
-  //     res.status(500).json({ status: 1, message: err.message });
-  //   }
-  // }
-
-  // async changeStatus(req: Request, res: Response) {
-  //   const list = req.body;
-  //   const transaction = new sql.Transaction(conpool);
-
-  //   try {
-  //     await transaction.begin();
-
-  //     for (const row of list) {
-  //       await executeDbQuery(
-  //         `UPDATE DGL_ORDERTRN SET SAMPLESTATUS='SC', TESTSTATUS='SC' WHERE ORDERNO=@orderNo AND TESTCODE=@testCode`,
-  //         { orderNo: row.orderNo || row.ORDERNO, testCode: row.testCode || row.TESTCODE },
-  //         { transaction }
-  //       );
-  //     }
-
-  //     await transaction.commit();
-  //     res.json({ status: 0, message: "Updated successfully" });
-  //   } catch (err: any) {
-  //     await transaction.rollback();
-  //     res.status(500).json({ status: 1, message: err.message });
-  //   }
-  // }
-
-  async submitSample(req: Request, res: Response) {
-    const { selectedTests, collectionInfo } = req.body;
-
-    if (!selectedTests || selectedTests.length === 0) {
-      return res.status(400).json({ message: "No tests selected" });
-    }
-    const user = (req as any).user;
+  async changeStatus(req: Request, res: Response): Promise<void> {
+    const input = req.body;
     const transaction = new sql.Transaction(conpool);
 
     try {
       await transaction.begin();
 
-      for (const test of selectedTests) {
-        const result = await executeDbQuery(
-          `UPDATE DGL_ORDERTRN SET 
-          SAMPLESTATUS = 'SC',
-          TESTSTATUS = 'SC',
-          SAMLECOLNO = @sampleNo,
-          SAMLECOLBY = @collectedBy,
-          SAMCOLDATE = @collectedDate,
-          SAMCOLTIME = @collectedTime,
-          CONTCODE = @containerCode 
-          WHERE ORDERNO = @orderNo 
-          AND CLNORGCODE = @hospitalId`,
-          {
-            sampleNo: collectionInfo.labCode || "",
-            collectedBy: collectionInfo.collectedBy,
-            collectedDate: new Date(),
-            collectedTime: new Date().toTimeString().split(" ")[0],
-            containerCode: test.CONTCODE,
-            orderNo: test.ORDERNO,
-            testCode: test.TESTCODE,
-            hospitalId: collectionInfo.hospitalId,
-          },
-        );
+      for (const data of input) {
+        const params = {
+          SampleStatus: "SC",
+          LabCode: data.LabCode || "",
+          CollectedBy: data.CollectedBy || "",
+          ExternalVendor: data.ExternalVendor || "",
+          OrderNo: data.OrderNo,
+          TestCode: data.TestCode,
+        };
 
-        if (result.rowsAffected[0] === 0) {
-          throw new Error(`No rows updated for ${test.ORDERNO}`);
-        }
+        const query = `
+          UPDATE DGL_ORDERTRN
+          SET SAMPLESTATUS = @SampleStatus,
+              TESTSTATUS = @SampleStatus,
+              LABCODE = @LabCode,
+              COLLECTEDBY = @CollectedBy,
+              EXTDIGCODE = @ExternalVendor
+          WHERE ORDERNO = @OrderNo
+            AND TESTCODE = @TestCode
+        `;
+
+        await executeDbQuery(query, params, { transaction });
       }
 
       await transaction.commit();
-
-      res.json({
-        status: 0,
-        message: "Sample collection saved successfully",
-        count: selectedTests.length,
-      });
+      res.json({ status: 0, message: "Updated successfully" });
     } catch (err: any) {
       await transaction.rollback();
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async updateDGLORDERTRN(req: Request, res: Response): Promise<void> {
+    const input = req.body;
+    const sampleDetailsList = input.sampleDetailsList || [];
+    const invoiceNo = input.invoiceNo || "";
+    const hospitalId = input.hospitalId || "";
+
+    const transaction = new sql.Transaction(conpool);
+
+    try {
+      await transaction.begin();
+
+      for (const row of sampleDetailsList) {
+        const params = {
+          ORDERNO: row.OrderNo,
+          TESTCODE: row.TestCode,
+          CLNORGCODE: hospitalId,
+          SAMLECOLNO: invoiceNo,
+          COLLECTEDBY: row.CollectedBy,
+        };
+
+        const query = `
+          UPDATE DGL_ORDERTRN
+          SET SAMLECOLNO = @SAMLECOLNO,
+              SAMLECOLBY = @COLLECTEDBY,
+              SAMPLESTATUS = 'SA',
+              TESTSTATUS = 'SA'
+          WHERE ORDERNO = @ORDERNO
+            AND TESTCODE = @TESTCODE
+            AND CLNORGCODE = @CLNORGCODE
+        `;
+
+        await executeDbQuery(query, params, { transaction });
+      }
+
+      await transaction.commit();
+      res.json({ status: 0, message: "Success", data: invoiceNo });
+    } catch (err: any) {
+      await transaction.rollback();
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async getDetails(req: Request, res: Response): Promise<void> {
+    const input = req.body || req.query;
+
+    try {
+      const query = `
+        SELECT TOP 100 *
+        FROM DGL_ORDERTRN
+        WHERE CLNORGCODE = @CLNORGCODE
+      `;
+
+      const { records } = await executeDbQuery(query, {
+        CLNORGCODE: input.hospitalId,
+      });
+
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
       res.status(500).json({ status: 1, message: err.message });
     }
   }
