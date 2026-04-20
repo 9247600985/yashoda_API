@@ -20,6 +20,11 @@ export default class resultEntryController {
       this.getPatientDetails.bind(this),
     );
     this.router.get(
+      "/get_ResultList",
+      authenticateToken,
+      this.get_ResultList.bind(this),
+    );
+    this.router.get(
       "/get_GridDetails",
       authenticateToken,
       this.getGridDetails.bind(this),
@@ -528,7 +533,7 @@ export default class resultEntryController {
             RESULTNO: Result_Number,
             TESTCODE: item.TESTCODE,
             INVESTCODE: item.INVESTCODE,
-            UNIT: item.UNITCODE,
+            UNIT: item.UNITCODE || item.UNITNAME,
             NORMALVAL1: item.MINVAL,
             NORMALVAL2: item.MAXVAL,
             DFTVAL: item.DFTVAL,
@@ -571,7 +576,7 @@ export default class resultEntryController {
             RESULTNO: Result_Number,
             TESTCODE: item.TESTCODE,
             INVESTCODE: item.INVESTCODE,
-            UNIT: item.UNITCODE,
+            UNIT: item.UNITCODE || item.UNITNAME,
             NORMALVAL1: item.MINVAL,
             NORMALVAL2: item.MAXVAL,
             DFTVAL: item.DFTVAL,
@@ -684,6 +689,289 @@ export default class resultEntryController {
         await transaction.rollback();
       } catch {}
       res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async get_ResultList(req: Request, res: Response): Promise<void> {
+    const input: any =
+      (req.body && Object.keys(req.body).length ? req.body : req.query) || {};
+
+    const FromDate = (input.FromDate ?? input.fromdate ?? "").toString().trim();
+    const ToDate = (input.ToDate ?? input.todate ?? "").toString().trim();
+    const LabDeptCode = (input.LabDeptCode ?? input.deptcode ?? "")
+      .toString()
+      .trim();
+    const LabCode = (input.LabCode ?? input.labcode ?? "").toString().trim();
+    const PatientType = (input.PatientType ?? input.pattype ?? "")
+      .toString()
+      .trim();
+    const Priority = (input.Priority ?? input.priority ?? "").toString().trim();
+    const SampleType = (input.SampleType ?? input.samplestatus ?? "")
+      .toString()
+      .trim();
+    const Clnorgcode = (
+      input.Clnorgcode ??
+      input.hospid ??
+      input.CLNORGCODE ??
+      ""
+    )
+      .toString()
+      .trim();
+    const SearchText = (input.SearchText ?? input.searchText ?? "")
+      .toString()
+      .trim();
+    const MRNO = (input.mrno ?? input.MRNO ?? "").toString().trim();
+    const IPNO = (input.ipno ?? input.IPNO ?? "").toString().trim();
+    const PatName = (input.patname ?? input.PatName ?? "").toString().trim();
+    const CustomerId = (input.CustomerId ?? input.CUSTOMERID ?? "")
+      .toString()
+      .trim();
+
+    console.log("get_ResultList input:", input);
+
+    let whereClause = ` WHERE 1 = 1 `;
+    const params: any = {};
+
+    if (Clnorgcode) {
+      whereClause += ` AND OM.CLNORGCODE = @CLNORGCODE `;
+      params.CLNORGCODE = Clnorgcode;
+    }
+
+    if (FromDate && ToDate) {
+      whereClause += `
+      AND CONVERT(date, OT.ORDERDATE)
+      BETWEEN CONVERT(date, @FromDate, 103)
+      AND CONVERT(date, @ToDate, 103)
+    `;
+      params.FromDate = FromDate;
+      params.ToDate = ToDate;
+    } else if (FromDate) {
+      whereClause += ` AND CONVERT(date, OT.ORDERDATE) >= CONVERT(date, @FromDate, 103) `;
+      params.FromDate = FromDate;
+    } else if (ToDate) {
+      whereClause += ` AND CONVERT(date, OT.ORDERDATE) <= CONVERT(date, @ToDate, 103) `;
+      params.ToDate = ToDate;
+    }
+
+    if (LabDeptCode) {
+      whereClause += ` AND OT.LABDPTCODE = @LABDPTCODE `;
+      params.LABDPTCODE = LabDeptCode;
+    }
+
+    if (LabCode) {
+      whereClause += ` AND OT.LABCODE = @LABCODE `;
+      params.LABCODE = LabCode;
+    }
+
+    if (Priority) {
+      whereClause += ` AND ISNULL(OT.PRIORITY, '') = @PRIORITY `;
+      params.PRIORITY = Priority;
+    }
+
+    // safer sample type handling
+    // old UI sends SA / RE
+    if (SampleType) {
+      whereClause += ` AND ISNULL(OT.SAMPLESTATUS, '') = @SAMPLESTATUS `;
+      params.SAMPLESTATUS = SampleType;
+    }
+
+    // patient type handling kept loose for now
+    // because old values O / D may not directly match DB logic
+    if (PatientType === "O") {
+      whereClause += ` AND ISNULL(OM.IPNO, '') = '' `;
+    }
+    // if D needs special logic, add later after testing actual DB data
+
+    if (MRNO) {
+      whereClause += ` AND ISNULL(OM.MEDRECNO, '') LIKE '%' + @MRNO + '%' `;
+      params.MRNO = MRNO;
+    }
+
+    if (IPNO) {
+      whereClause += ` AND ISNULL(OM.IPNO, '') LIKE '%' + @IPNO + '%' `;
+      params.IPNO = IPNO;
+    }
+
+    if (PatName) {
+      whereClause += ` AND ISNULL(OM.PATNAME, '') LIKE '%' + @PATNAME + '%' `;
+      params.PATNAME = PatName;
+    }
+
+    if (CustomerId) {
+      whereClause += ` AND ISNULL(BM.CRDCOMPCD, '') = @CUSTOMERID `;
+      params.CUSTOMERID = CustomerId;
+    }
+
+    if (SearchText) {
+      whereClause += `
+      AND (
+        ISNULL(OT.ACCEPTANNO, '') LIKE '%' + @SEARCHTEXT + '%'
+        OR ISNULL(OT.ORDERNO, '') LIKE '%' + @SEARCHTEXT + '%'
+        OR ISNULL(OT.SAMLECOLNO, '') LIKE '%' + @SEARCHTEXT + '%'
+        OR ISNULL(OT.RESULTNO, '') LIKE '%' + @SEARCHTEXT + '%'
+        OR ISNULL(OM.PATNAME, '') LIKE '%' + @SEARCHTEXT + '%'
+        OR ISNULL(OM.MEDRECNO, '') LIKE '%' + @SEARCHTEXT + '%'
+        OR ISNULL(OM.IPNO, '') LIKE '%' + @SEARCHTEXT + '%'
+        OR ISNULL(OT.TESTCODE, '') LIKE '%' + @SEARCHTEXT + '%'
+        OR ISNULL(TM.TESTNAME, '') LIKE '%' + @SEARCHTEXT + '%'
+      )
+    `;
+      params.SEARCHTEXT = SearchText;
+    }
+
+    const query = `
+    ;WITH ResultListCTE AS
+    (
+      SELECT
+        OT.ACCEPTANNO,
+        OT.ORDERNO,
+        OT.SAMLECOLNO,
+        ISNULL(OT.RESULTNO, '') AS RESULTNO,
+        ISNULL(OT.LABCODE, '') AS LABCODE,
+        ISNULL(OT.LABDPTCODE, '') AS LABDPTCODE,
+        ISNULL(LD.LABDPTDESC, '') AS LABDPTDESC,
+
+        ISNULL(OM.BILLNO, '') AS BILLNO,
+        ISNULL(OM.MEDRECNO, '') AS MRNO,
+        ISNULL(OM.IPNO, '') AS IPNO,
+        ISNULL(OM.PATNAME, '') AS PATNAME,
+        ISNULL(OM.AGE, '') AS AGE,
+        ISNULL(OM.SEX, '') AS SEX,
+        ISNULL(OM.PATCATG, '') AS PATCATG,
+
+        ISNULL(OT.TESTCODE, '') AS TESTCODE,
+        ISNULL(TM.TESTNAME, '') AS TESTNAME,
+        ISNULL(OT.SPECCODE, '') AS SPECCODE,
+
+        ISNULL(OT.PRIORITY, '') AS PRIORITY,
+        ISNULL(OT.SAMPLESTATUS, '') AS SAMPLESTATUS,
+        ISNULL(RM.RESUSTATUS, '') AS RESUSTATUS,
+
+        CONVERT(VARCHAR(10), OT.ORDERDATE, 103) + ' ' +
+        CONVERT(VARCHAR(8), OT.ORDERTIME, 108) AS ORDERDATE_TEXT,
+
+        CASE
+          WHEN OT.SAMCOLDATE IS NOT NULL
+          THEN CONVERT(VARCHAR(10), OT.SAMCOLDATE, 103) + ' ' +
+               CONVERT(VARCHAR(8), OT.SAMCOLTIME, 108)
+          ELSE ''
+        END AS SAMPLECOLLDATE,
+
+        CASE
+          WHEN OT.RECEIVEDON IS NOT NULL
+          THEN CONVERT(VARCHAR(10), OT.RECEIVEDON, 103) + ' ' +
+               CONVERT(VARCHAR(8), OT.RECEIVEDAT, 108)
+          ELSE ''
+        END AS RECEIVEDDATE,
+
+        CASE
+          WHEN RM.RESULTDATE IS NOT NULL
+          THEN CONVERT(VARCHAR(10), RM.RESULTDATE, 103) + ' ' +
+               CONVERT(VARCHAR(8), RM.RESULTDATE, 108)
+          ELSE ''
+        END AS RESULTDATE_TEXT,
+
+        OM.CLNORGCODE,
+        OT.ORDERDATE AS ORDERDATE_SORT,
+        OT.ORDERTIME AS ORDERTIME_SORT,
+
+        ROW_NUMBER() OVER (
+          PARTITION BY OT.ACCEPTANNO, OT.ORDERNO, OT.SAMLECOLNO, OT.TESTCODE
+          ORDER BY OT.ORDERDATE DESC, OT.ORDERTIME DESC
+        ) AS RN
+      FROM DGL_ORDERTRN OT
+      INNER JOIN DGL_ORDERMST OM
+        ON OM.ORDERNO = OT.ORDERNO
+      LEFT JOIN DGL_TESTMASTER TM
+        ON TM.TESTCODE = OT.TESTCODE
+      LEFT JOIN DGL_LABDEPT LD
+        ON LD.LABDPTCODE = OT.LABDPTCODE
+      LEFT JOIN DGL_RESULTMST RM
+        ON RM.ORDERNO = OT.ORDERNO
+        AND RM.SAMLECOLNO = OT.SAMLECOLNO
+        AND RM.ACCEPTANNO = OT.ACCEPTANNO
+        AND RM.CLNORGCODE = OM.CLNORGCODE
+      LEFT JOIN OPD_BILLMST BM
+        ON BM.BILLNO = OM.BILLNO
+      ${whereClause}
+    )
+    SELECT
+      ACCEPTANNO,
+      ORDERNO,
+      SAMLECOLNO,
+      RESULTNO,
+      LABCODE,
+      LABDPTCODE,
+      LABDPTDESC,
+      BILLNO,
+      MRNO,
+      IPNO,
+      PATNAME,
+      AGE,
+      SEX,
+      PATCATG,
+      TESTCODE,
+      TESTNAME,
+      SPECCODE,
+      PRIORITY,
+      SAMPLESTATUS,
+      RESUSTATUS,
+      ORDERDATE_TEXT,
+      SAMPLECOLLDATE,
+      RECEIVEDDATE,
+      RESULTDATE_TEXT,
+      CLNORGCODE
+    FROM ResultListCTE
+    WHERE RN = 1
+    ORDER BY ORDERDATE_SORT DESC, ORDERTIME_SORT DESC, ORDERNO DESC
+  `;
+
+    try {
+      const { records } = await executeDbQuery(query, params);
+
+      console.log("get_ResultList rows count:", records?.length || 0);
+
+      const details = records.map((r: any) => ({
+        AcceptNo: r.ACCEPTANNO ?? "",
+        OrderNo: r.ORDERNO ?? "",
+        SampleColNo: r.SAMLECOLNO ?? "",
+        RESULTNO: r.RESULTNO ?? "",
+
+        LabCode: r.LABCODE ?? "",
+        LabDeptCode: r.LABDPTCODE ?? "",
+        LabDeptDesc: r.LABDPTDESC ?? "",
+
+        BillNo: r.BILLNO ?? "",
+        MRNO: r.MRNO ?? "",
+        IPNO: r.IPNO ?? "",
+        PatName: r.PATNAME ?? "",
+        Age: r.AGE ?? "",
+        Sex: r.SEX ?? "",
+        PatCatg: r.PATCATG ?? "",
+
+        TESTCODE: r.TESTCODE ?? "",
+        TESTNAME: r.TESTNAME ?? "",
+        SpecimenCode: r.SPECCODE ?? "",
+
+        Priority: r.PRIORITY ?? "",
+        SampleStatus: r.SAMPLESTATUS ?? "",
+        ResultStatus: r.RESUSTATUS ?? "",
+
+        OrderDate: r.ORDERDATE_TEXT ?? "",
+        SampleCollDate: r.SAMPLECOLLDATE ?? "",
+        ReceivedDate: r.RECEIVEDDATE ?? "",
+        ResultDate: r.RESULTDATE_TEXT ?? "",
+
+        Clnorgcode: r.CLNORGCODE ?? "",
+      }));
+
+      res.json({ status: 0, d: details });
+    } catch (err: any) {
+      console.error("get_ResultList error:", err);
+      res.status(500).json({
+        status: 1,
+        message: err?.message || "Failed to fetch result list",
+      });
     }
   }
 }
