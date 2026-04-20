@@ -2,6 +2,7 @@ import express, { Request, Response, Router } from "express";
 import { conpool, executeDbQuery } from "../../db";
 import { containsSpecialCharacters, numberToWords } from "../../utilities/helpers";
 import { authenticateToken } from "../../utilities/authMiddleWare";
+
 import sql from "mssql";
 const moment = require('moment');
 
@@ -254,8 +255,8 @@ this.router.get("/getTariffCategories", authenticateToken, this.getTariffCategor
             let totCnAmt = 0;
             let html = `
       <caption>Category Wise Patient</caption>
-      <thead>
-        <tr class='TABLE-PRIMARY'>
+      <thead class="table-primary">
+        <tr >
           <th style='text-align:left;'>Credit Note No.</th>
           <th style='text-align:left;'>Bill No.</th>
           <th style='text-align:left;'>Bill Date</th>
