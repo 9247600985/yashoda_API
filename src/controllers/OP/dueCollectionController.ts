@@ -133,7 +133,9 @@ export default class dueCollectionController {
 
             const data = await executeDbQuery(sqlText, params, {});
             const records = data.records;
-            const total = records.reduce((sum: number, r: any) => sum + (r.AMOUNT || "0.00"), 0);
+            const total = records.reduce((sum: number, r: any) => sum + parseFloat(r.AMOUNT ?? 0), 0);
+
+            // const total = records.reduce((sum: number, r: any) => sum + (r.AMOUNT || "0.00"), 0);
 
 
             let html = `
