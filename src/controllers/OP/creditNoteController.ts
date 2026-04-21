@@ -446,7 +446,9 @@ this.router.get("/getTariffCategories", authenticateToken, this.getTariffCategor
                     PC_Code: input.getUII?.PC_Code,
                     TARIFFID: input.getUII?.TARIFFID,
                     REVISIONID: "",
+                    //  REVISIONID: input.REVISIONID,
                     CNNO: creditNoteNo,
+
                     OPDREGNO: input.getUI?.OPDREGNO
                 };
 
@@ -518,6 +520,7 @@ this.router.get("/getTariffCategories", authenticateToken, this.getTariffCategor
             });
         } catch (err: any) {
             await transaction.rollback();
+              console.error('saveCreditNote FULL ERROR:', err);
             res.status(500).json({ status: 1, message: err.message });
         }
     }

@@ -232,9 +232,10 @@ export default class dueCollectionController {
         const input = req.body;
 
         const params = {
-            CLNORGCODE: input.HOSPITALID,
+            CLNORGCODE: input.HOSPITALID || input.CLNORGCODE,
             MEDRECNO: input.MEDRECNO,
-            CNTRCODE: input.CNTRCODE,
+            // CNTRCODE: input.CNTRCODE,
+            CNTRCODE: input.CNTRCODE || input.cashCounter || '',
             RCPTTYPE: input.RCPTTYPE,
             OPDBILLNO: input.OPDBILLNO,
             PAYMODE: input.PAYMODE,
@@ -251,7 +252,8 @@ export default class dueCollectionController {
             EDITED_BY: input.CREATED_BY,
             REVISIONID: "",
             OPDREGNO: input.OPDREGNO,
-            compCode: input.CompId,
+            // compCode: input.CompId,
+            compCode: input.compCode,
         };
 
         const transaction = new sql.Transaction(conpool);
