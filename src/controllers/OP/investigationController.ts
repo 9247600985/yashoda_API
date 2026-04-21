@@ -177,6 +177,11 @@ export default class investigationController {
       authenticateToken,
       this.loadTariffCategories.bind(this),
     );
+    this.router.get(
+      "/loadCashCounters",
+      authenticateToken,
+      this.loadCashCounters.bind(this),
+    );
   }
 
   async getServicesInfo(req: Request, res: Response): Promise<void> {
@@ -1761,6 +1766,22 @@ export default class investigationController {
     FROM MST_TARIFFCATGORY
     WHERE STATUS = 'A'
     ORDER BY TARIFFDESC
+  `;
+
+    try {
+      const { records } = await executeDbQuery(sql, []);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+
+  async loadCashCounters(req: Request, res: Response): Promise<void> {
+    const sql = `
+    SELECT CashCounter_Code, CashCounter_Desc, Status
+    FROM Mst_CashCounter
+    WHERE Status = 'A'
+    ORDER BY CashCounter_Desc
   `;
 
     try {
