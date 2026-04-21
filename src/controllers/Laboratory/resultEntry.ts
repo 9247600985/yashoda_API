@@ -96,6 +96,7 @@ export default class resultEntryController {
         Sex: r.SEX ?? "",
         PatName: r.PATNAME ?? "",
         PatCatg: r.PATCATG ?? "",
+        OrderBy: r.DOCTNAME ?? "",
         NurStCode: r.NURSTCODE ?? "",
         Mobile: r.MOBILE ?? "",
         BedCatCode: r.BEDCATGCD ?? "",
@@ -105,7 +106,6 @@ export default class resultEntryController {
         TariffId: r.TARIFFID ?? "",
         LabDeptCode: r.LABDPTCODE ?? "",
         PatDOB: r.Patient_DOB ?? "",
-        OrderBy: r.ORDEREDBY ?? "",
         ReportTo: r.REPORTTO ?? "",
         SampleColNo: r.SAMLECOLNO ?? "",
         OrderNo: r.ORDERNO ?? "",
@@ -698,15 +698,33 @@ export default class resultEntryController {
 
     const FromDate = (input.FromDate ?? input.fromdate ?? "").toString().trim();
     const ToDate = (input.ToDate ?? input.todate ?? "").toString().trim();
+    const AcceptNo = (input.AcceptNo ?? input.acceptno ?? "").toString().trim();
     const LabDeptCode = (input.LabDeptCode ?? input.deptcode ?? "")
       .toString()
       .trim();
-    const LabCode = (input.LabCode ?? input.labcode ?? "").toString().trim();
     const PatientType = (input.PatientType ?? input.pattype ?? "")
       .toString()
-      .trim();
-    const Priority = (input.Priority ?? input.priority ?? "").toString().trim();
-    const SampleType = (input.SampleType ?? input.samplestatus ?? "")
+      .trim()
+      .toUpperCase();
+    const ResultType = (
+      input.ResultType ??
+      input.resultType ??
+      input.RESULTTYPE ??
+      input.SampleType ??
+      input.samplestatus ??
+      ""
+    )
+      .toString()
+      .trim()
+      .toUpperCase();
+    const Priority = (input.Priority ?? input.priority ?? "")
+      .toString()
+      .trim()
+      .toUpperCase();
+    const MRNO = (input.mrno ?? input.MRNO ?? "").toString().trim();
+    const IPNO = (input.ipno ?? input.IPNO ?? "").toString().trim();
+    const PatName = (input.patname ?? input.PatName ?? "").toString().trim();
+    const CustomerId = (input.CustomerId ?? input.CUSTOMERID ?? "")
       .toString()
       .trim();
     const Clnorgcode = (
@@ -717,73 +735,83 @@ export default class resultEntryController {
     )
       .toString()
       .trim();
-    const SearchText = (input.SearchText ?? input.searchText ?? "")
+    const LabTypeId = (
+      input.labTypeId ??
+      input.labtypid ??
+      input.LabTypeID ??
+      input.labType ??
+      "01"
+    )
       .toString()
       .trim();
-    const MRNO = (input.mrno ?? input.MRNO ?? "").toString().trim();
-    const IPNO = (input.ipno ?? input.IPNO ?? "").toString().trim();
-    const PatName = (input.patname ?? input.PatName ?? "").toString().trim();
-    const CustomerId = (input.CustomerId ?? input.CUSTOMERID ?? "")
-      .toString()
-      .trim();
-
-    console.log("get_ResultList input:", input);
 
     let whereClause = ` WHERE 1 = 1 `;
     const params: any = {};
 
-    if (Clnorgcode) {
-      whereClause += ` AND OM.CLNORGCODE = @CLNORGCODE `;
-      params.CLNORGCODE = Clnorgcode;
-    }
-
+    // Date filter
     if (FromDate && ToDate) {
       whereClause += `
-      AND CONVERT(date, OT.ORDERDATE)
-      BETWEEN CONVERT(date, @FromDate, 103)
-      AND CONVERT(date, @ToDate, 103)
+      AND OT.ACCEPTEDON >= CONVERT(datetime, @FromDate, 103)
+      AND OT.ACCEPTEDON < DATEADD(DAY, 1, CONVERT(datetime, @ToDate, 103))
     `;
       params.FromDate = FromDate;
       params.ToDate = ToDate;
     } else if (FromDate) {
-      whereClause += ` AND CONVERT(date, OT.ORDERDATE) >= CONVERT(date, @FromDate, 103) `;
+      whereClause += `
+      AND OT.ACCEPTEDON >= CONVERT(datetime, @FromDate, 103)
+    `;
       params.FromDate = FromDate;
     } else if (ToDate) {
-      whereClause += ` AND CONVERT(date, OT.ORDERDATE) <= CONVERT(date, @ToDate, 103) `;
+      whereClause += `
+      AND OT.ACCEPTEDON < DATEADD(DAY, 1, CONVERT(datetime, @ToDate, 103))
+    `;
       params.ToDate = ToDate;
     }
 
+    // Department
     if (LabDeptCode) {
-      whereClause += ` AND OT.LABDPTCODE = @LABDPTCODE `;
+      whereClause += ` AND ISNULL(OT.LABDPTCODE, '') = @LABDPTCODE `;
       params.LABDPTCODE = LabDeptCode;
     }
 
-    if (LabCode) {
-      whereClause += ` AND OT.LABCODE = @LABCODE `;
-      params.LABCODE = LabCode;
+    // Customer
+    if (CustomerId) {
+      whereClause += ` AND ISNULL(OM.CUSTOMERID, '') = @CUSTOMERID `;
+      params.CUSTOMERID = CustomerId;
     }
 
-    if (Priority) {
-      whereClause += ` AND ISNULL(OT.PRIORITY, '') = @PRIORITY `;
-      params.PRIORITY = Priority;
-    }
-
-    // safer sample type handling
-    // old UI sends SA / RE
-    if (SampleType) {
+    // Result/Sample Status
+    if (ResultType) {
       whereClause += ` AND ISNULL(OT.SAMPLESTATUS, '') = @SAMPLESTATUS `;
-      params.SAMPLESTATUS = SampleType;
+      params.SAMPLESTATUS = ResultType;
+    } else {
+      whereClause += ` AND ISNULL(OT.SAMPLESTATUS, '') IN ('SA','RE','RV','RD') `;
     }
 
-    // patient type handling kept loose for now
-    // because old values O / D may not directly match DB logic
-    if (PatientType === "O") {
-      whereClause += ` AND ISNULL(OM.IPNO, '') = '' `;
-    }
-    // if D needs special logic, add later after testing actual DB data
+    // Patient Type mapping
+    if (PatientType) {
+      let mappedPatientType = PatientType;
 
+      if (PatientType === "OP") mappedPatientType = "O";
+      else if (PatientType === "IP") mappedPatientType = "I";
+      else if (PatientType === "DIAGNOSTICS") mappedPatientType = "D";
+
+      whereClause += ` AND ISNULL(OM.ORDERTYPE, '') = @PATTYPE `;
+      params.PATTYPE = mappedPatientType;
+    }
+
+    // Priority (legacy-compatible)
+    if (Priority) {
+      whereClause += `
+    AND UPPER(LTRIM(RTRIM(ISNULL(OT.PRIORITY, '')))) 
+    LIKE '%' + @PRIORITY + '%'
+  `;
+      params.PRIORITY = String(Priority).trim().toUpperCase();
+    }
+
+    // Patient filters
     if (MRNO) {
-      whereClause += ` AND ISNULL(OM.MEDRECNO, '') LIKE '%' + @MRNO + '%' `;
+      whereClause += ` AND ISNULL(OM.OPDREGNO, '') LIKE '%' + @MRNO + '%' `;
       params.MRNO = MRNO;
     }
 
@@ -797,58 +825,65 @@ export default class resultEntryController {
       params.PATNAME = PatName;
     }
 
-    if (CustomerId) {
-      whereClause += ` AND ISNULL(BM.CRDCOMPCD, '') = @CUSTOMERID `;
-      params.CUSTOMERID = CustomerId;
+    if (AcceptNo) {
+      whereClause += ` AND ISNULL(OT.ACCEPTANNO, '') LIKE '%' + @ACCEPTNO + '%' `;
+      params.ACCEPTNO = AcceptNo;
     }
 
-    if (SearchText) {
-      whereClause += `
-      AND (
-        ISNULL(OT.ACCEPTANNO, '') LIKE '%' + @SEARCHTEXT + '%'
-        OR ISNULL(OT.ORDERNO, '') LIKE '%' + @SEARCHTEXT + '%'
-        OR ISNULL(OT.SAMLECOLNO, '') LIKE '%' + @SEARCHTEXT + '%'
-        OR ISNULL(OT.RESULTNO, '') LIKE '%' + @SEARCHTEXT + '%'
-        OR ISNULL(OM.PATNAME, '') LIKE '%' + @SEARCHTEXT + '%'
-        OR ISNULL(OM.MEDRECNO, '') LIKE '%' + @SEARCHTEXT + '%'
-        OR ISNULL(OM.IPNO, '') LIKE '%' + @SEARCHTEXT + '%'
-        OR ISNULL(OT.TESTCODE, '') LIKE '%' + @SEARCHTEXT + '%'
-        OR ISNULL(TM.TESTNAME, '') LIKE '%' + @SEARCHTEXT + '%'
-      )
-    `;
-      params.SEARCHTEXT = SearchText;
+    if (LabTypeId) {
+      whereClause += ` AND ISNULL(OM.LABTYPECD, '') = @LABTYPECD `;
+      params.LABTYPECD = LabTypeId;
     }
+
+    if (Clnorgcode) {
+      whereClause += ` AND ISNULL(OM.CLNORGCODE, '') = @CLNORGCODE `;
+      params.CLNORGCODE = Clnorgcode;
+    }
+
+    // Keep only non-verified / pending-to-report items
+    whereClause += ` AND (RM.RESUSTATUS <> 'RV' OR RM.RESUSTATUS IS NULL) `;
 
     const query = `
     ;WITH ResultListCTE AS
     (
-      SELECT
-        OT.ACCEPTANNO,
-        OT.ORDERNO,
-        OT.SAMLECOLNO,
-        ISNULL(OT.RESULTNO, '') AS RESULTNO,
-        ISNULL(OT.LABCODE, '') AS LABCODE,
-        ISNULL(OT.LABDPTCODE, '') AS LABDPTCODE,
-        ISNULL(LD.LABDPTDESC, '') AS LABDPTDESC,
+      SELECT DISTINCT
+        OT.SEQNO,
+        ISNULL(RM.RESULTNO, '') AS RESULTNO,
+        RM.RESULTDATE,
+        ISNULL(RT.RESTEXT, '') AS RESTEXT,
+        ISNULL(OT.SAMLECOLNO, '') AS SAMLECOLNO,
+        ISNULL(OT.ACCEPTANNO, '') AS ACCEPTANNO,
+        OT.ACCEPTEDON,
+        OT.ACCEPTEDAT,
 
         ISNULL(OM.BILLNO, '') AS BILLNO,
+        ISNULL(OM.ORDERNO, '') AS ORDERNO,
         ISNULL(OM.MEDRECNO, '') AS MRNO,
         ISNULL(OM.IPNO, '') AS IPNO,
         ISNULL(OM.PATNAME, '') AS PATNAME,
         ISNULL(OM.AGE, '') AS AGE,
         ISNULL(OM.SEX, '') AS SEX,
         ISNULL(OM.PATCATG, '') AS PATCATG,
+        ISNULL(OM.OPDREGNO, '') AS OPDNO,
+        ISNULL(OM.CLINICALNOTES, '') AS CLINICALNOTES,
+        ISNULL(OM.RACECD, '') AS RACECD,
+
+        ISNULL(DM.Firstname, '') AS FIRSTNAME,
 
         ISNULL(OT.TESTCODE, '') AS TESTCODE,
         ISNULL(TM.TESTNAME, '') AS TESTNAME,
         ISNULL(OT.SPECCODE, '') AS SPECCODE,
+        ISNULL(SM.SPECDESC, '') AS SPECDESC,
+        ISNULL(OT.RLTPANPROF, '') AS RLTPANPROF,
 
         ISNULL(OT.PRIORITY, '') AS PRIORITY,
         ISNULL(OT.SAMPLESTATUS, '') AS SAMPLESTATUS,
         ISNULL(RM.RESUSTATUS, '') AS RESUSTATUS,
 
-        CONVERT(VARCHAR(10), OT.ORDERDATE, 103) + ' ' +
-        CONVERT(VARCHAR(8), OT.ORDERTIME, 108) AS ORDERDATE_TEXT,
+        CONVERT(VARCHAR(10), OT.ACCEPTEDON, 103) AS ACCEPTEDDATE_TEXT,
+        CONVERT(VARCHAR(8), OT.ACCEPTEDAT, 108) AS ACCEPTEDTIME_TEXT,
+        CONVERT(VARCHAR(10), OT.ACCEPTEDON, 103) + ' ' +
+        CONVERT(VARCHAR(8), OT.ACCEPTEDAT, 108) AS ACCEPTEDDATETIME_TEXT,
 
         CASE
           WHEN OT.SAMCOLDATE IS NOT NULL
@@ -858,88 +893,88 @@ export default class resultEntryController {
         END AS SAMPLECOLLDATE,
 
         CASE
-          WHEN OT.RECEIVEDON IS NOT NULL
-          THEN CONVERT(VARCHAR(10), OT.RECEIVEDON, 103) + ' ' +
-               CONVERT(VARCHAR(8), OT.RECEIVEDAT, 108)
-          ELSE ''
-        END AS RECEIVEDDATE,
-
-        CASE
           WHEN RM.RESULTDATE IS NOT NULL
           THEN CONVERT(VARCHAR(10), RM.RESULTDATE, 103) + ' ' +
                CONVERT(VARCHAR(8), RM.RESULTDATE, 108)
           ELSE ''
         END AS RESULTDATE_TEXT,
 
-        OM.CLNORGCODE,
-        OT.ORDERDATE AS ORDERDATE_SORT,
-        OT.ORDERTIME AS ORDERTIME_SORT,
+        ISNULL(OM.CLNORGCODE, '') AS CLNORGCODE,
 
         ROW_NUMBER() OVER (
-          PARTITION BY OT.ACCEPTANNO, OT.ORDERNO, OT.SAMLECOLNO, OT.TESTCODE
-          ORDER BY OT.ORDERDATE DESC, OT.ORDERTIME DESC
+          PARTITION BY OT.ACCEPTANNO, OM.ORDERNO, OT.SEQNO
+          ORDER BY OM.ORDERNO, OT.ACCEPTANNO, OT.SEQNO
         ) AS RN
       FROM DGL_ORDERTRN OT
-      INNER JOIN DGL_ORDERMST OM
-        ON OM.ORDERNO = OT.ORDERNO
+      LEFT JOIN DGL_ORDERMST OM
+        ON OT.ORDERNO = OM.ORDERNO
       LEFT JOIN DGL_TESTMASTER TM
-        ON TM.TESTCODE = OT.TESTCODE
-      LEFT JOIN DGL_LABDEPT LD
-        ON LD.LABDPTCODE = OT.LABDPTCODE
+        ON OT.TESTCODE = TM.TESTCODE
+      LEFT JOIN Mst_DoctorMaster DM
+        ON OM.ORDEREDBY = DM.Code
+      LEFT JOIN DGL_SPECIMENMAST SM
+        ON OT.SPECCODE = SM.SPECCODE
+      LEFT JOIN DGL_ReportTypeMAST RT
+        ON TM.RESTYPECD = RT.RESCODE
       LEFT JOIN DGL_RESULTMST RM
-        ON RM.ORDERNO = OT.ORDERNO
+        ON RM.ORDERNO = OM.ORDERNO
         AND RM.SAMLECOLNO = OT.SAMLECOLNO
         AND RM.ACCEPTANNO = OT.ACCEPTANNO
-        AND RM.CLNORGCODE = OM.CLNORGCODE
-      LEFT JOIN OPD_BILLMST BM
-        ON BM.BILLNO = OM.BILLNO
       ${whereClause}
     )
     SELECT
-      ACCEPTANNO,
-      ORDERNO,
-      SAMLECOLNO,
       RESULTNO,
-      LABCODE,
-      LABDPTCODE,
-      LABDPTDESC,
+      SAMLECOLNO,
+      ACCEPTANNO,
+      ACCEPTEDON,
+      ACCEPTEDAT,
       BILLNO,
+      ORDERNO,
       MRNO,
       IPNO,
       PATNAME,
       AGE,
       SEX,
       PATCATG,
+      OPDNO,
+      FIRSTNAME,
       TESTCODE,
       TESTNAME,
       SPECCODE,
+      SPECDESC,
       PRIORITY,
       SAMPLESTATUS,
       RESUSTATUS,
-      ORDERDATE_TEXT,
+      RESTEXT,
+      ACCEPTEDDATE_TEXT,
+      ACCEPTEDTIME_TEXT,
+      ACCEPTEDDATETIME_TEXT,
       SAMPLECOLLDATE,
-      RECEIVEDDATE,
       RESULTDATE_TEXT,
       CLNORGCODE
     FROM ResultListCTE
     WHERE RN = 1
-    ORDER BY ORDERDATE_SORT DESC, ORDERTIME_SORT DESC, ORDERNO DESC
+    ORDER BY ORDERNO, ACCEPTANNO, TESTCODE
   `;
 
     try {
+      console.log("get_ResultList input:", input);
+      console.log("get_ResultList params:", params);
+      console.log("get_ResultList whereClause:", whereClause);
+
       const { records } = await executeDbQuery(query, params);
 
-      console.log("get_ResultList rows count:", records?.length || 0);
+      console.log("get_ResultList record count:", records?.length || 0);
 
       const details = records.map((r: any) => ({
-        AcceptNo: r.ACCEPTANNO ?? "",
+        AcceptNo: r.ACCEPTANNO || r.ORDERNO || "",
         OrderNo: r.ORDERNO ?? "",
         SampleColNo: r.SAMLECOLNO ?? "",
         RESULTNO: r.RESULTNO ?? "",
 
-        LabCode: r.LABCODE ?? "",
-        LabDeptCode: r.LABDPTCODE ?? "",
-        LabDeptDesc: r.LABDPTDESC ?? "",
+        LabCode: "",
+        LabDeptCode: "",
+        LabDeptDesc: "",
 
         BillNo: r.BILLNO ?? "",
         MRNO: r.MRNO ?? "",
@@ -948,6 +983,8 @@ export default class resultEntryController {
         Age: r.AGE ?? "",
         Sex: r.SEX ?? "",
         PatCatg: r.PATCATG ?? "",
+        OPDNo: r.OPDNO ?? "",
+        OrderBy: r.FIRSTNAME ?? "",
 
         TESTCODE: r.TESTCODE ?? "",
         TESTNAME: r.TESTNAME ?? "",
@@ -956,10 +993,18 @@ export default class resultEntryController {
         Priority: r.PRIORITY ?? "",
         SampleStatus: r.SAMPLESTATUS ?? "",
         ResultStatus: r.RESUSTATUS ?? "",
+        ResultTypeText: r.RESTEXT ?? "",
 
-        OrderDate: r.ORDERDATE_TEXT ?? "",
+        AcceptedDate: r.ACCEPTEDDATE_TEXT ?? "",
+        AcceptedTime: r.ACCEPTEDTIME_TEXT ?? "",
+        AcceptedDateTime: r.ACCEPTEDDATETIME_TEXT ?? "",
+
+        OrderDate: r.ACCEPTEDDATE_TEXT ?? "",
+        OrderTime: r.ACCEPTEDTIME_TEXT ?? "",
+        OrderDateTime: r.ACCEPTEDDATETIME_TEXT ?? "",
+
         SampleCollDate: r.SAMPLECOLLDATE ?? "",
-        ReceivedDate: r.RECEIVEDDATE ?? "",
+        ReceivedDate: "",
         ResultDate: r.RESULTDATE_TEXT ?? "",
 
         Clnorgcode: r.CLNORGCODE ?? "",
