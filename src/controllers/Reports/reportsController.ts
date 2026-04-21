@@ -25,9 +25,19 @@ export default class reportsController {
     this.router.get("/bindUsers", authenticateToken, this.bindUsers.bind(this));
       this.router.get("/getonlyDoctors", authenticateToken, this.getonlyDoctors.bind(this));
         this.router.get("/loadClinics", authenticateToken, this.loadClinics.bind(this));
+        this.router.get("/getServiceGroupDropDown", authenticateToken, this.getServiceGroupDropDown.bind(this));
     
   }
-  async loadClinics(req: Request, res: Response): Promise<void> {
+  async getServiceGroupDropDown(req: Request, res: Response): Promise<void> {
+    const sql = `select LABDPTCODE,LABDPTDESC,Status from DGL_LABDEPT WHERE Status='A' order by LABDPTDESC`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+async loadClinics(req: Request, res: Response): Promise<void> {
     const sql = `select CLINIC_CODE,CLINIC_NAME,Status from TM_CLINICS WHERE Status='A' order by CLINIC_NAME`;
     try {
       const { records } = await executeDbQuery(sql);
@@ -36,7 +46,6 @@ export default class reportsController {
       res.status(500).json({ status: 1, result: err.message });
     }
   }
-
 
   async getonlyDoctors(req: Request, res: Response): Promise<void> {
     const sql = `select Code,Firstname,Status from Mst_DoctorMaster WHERE Status='A' order by Firstname`;
