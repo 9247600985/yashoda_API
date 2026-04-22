@@ -79,7 +79,7 @@ export default class resultEntryController {
     const AcceptnaceNo = input.AcceptnaceNo;
     const OrderNo = input.OrderNo;
 
-    const query = `  SELECT distinct ot.acceptanno, om.billno, ot.LABCODE,om.MEDRECNO, om.IPNO, om.AGE, om.SEX, om.PATNAME, om.PATCATG, om.NURSTCODE, pm.MOBILE, om.BEDCATGCD, ot.SPECCODE, mw.WARDDESC, bd.BED_NAME, om.TARIFFID, ot.LABDPTCODE, pm.Patient_DOB, om.ORDEREDBY, om.REPORTTO, ot.SAMLECOLNO, ot.ORDERNO,SL.Sal_Desc,ISNULL(C.NAME,'')AS COMPNAME,  CONVERT(VARCHAR(10),OT.ORDERDATE,103)  +' ' +  CONVERT(VARCHAR(8),OT.ORDERTIME,108) as ORDERDATE, CONVERT(VARCHAR(10),OT.SAMCOLDATE,103)  +' ' +  CONVERT(VARCHAR(8),OT.SAMCOLTIME,108) as SAMPLECOLLDATE, CONVERT(VARCHAR(10),OT.RECEIVEDON,103)  +' ' +  CONVERT(VARCHAR(8),OT.RECEIVEDAT,108) as SAMPLERCVDDATE, CONVERT(VARCHAR(10),OT.RESULTDATE,103)  +' ' +  CONVERT(VARCHAR(8),OT.RESULTTIME,108) as RESULTENTERDATE, OT.RESULTNO,om.clnorgcode, BM.CRDCOMPCD AS CUSTOMERID,BM.REFDOCTCD,RM.RefDoctor_FName,DM.Firstname AS DOCTNAME FROM DGL_ORDERTRN ot LEFT JOIN DGL_ORDERMST om on ot.ORDERNO=om.ORDERNO LEFT JOIN OPD_BILLMST BM ON BM.BILLNO=OM.BILLNO LEFT JOIN Mst_ReferralDoctor RM ON RM.RefDoct_ID=BM.REFDOCTCD LEFT JOIN Mst_DoctorMaster DM ON DM.CODE=BM.DOCTCD LEFT JOIN Patient_Master pm on om.MEDRECNO=pm.PatientMr_No INNER JOIN Mst_Salutation SL ON SL.Sal_Code=BM.SALUTNCODE LEFT JOIN MST_BED_DETAILS bd ON om.BEDNO=bd.BED_NAME  LEFT JOIN MST_WARDS mw ON om.WARDNO=mw.WARDDESC LEFT JOIN COMPANY C ON C.Com_Id=BM.CRDCOMPCD WHERE ot.SAMLECOLNO=@SampleCollectNo and ot.acceptanno=@AcceptnaceNo and ot.ORDERNO=@OrderNo  `;
+    const query = `  SELECT distinct ot.acceptanno, om.billno, ot.LABCODE,om.MEDRECNO, om.IPNO, om.AGE, om.SEX, om.PATNAME, om.PATCATG, om.NURSTCODE, pm.MOBILE, om.BEDCATGCD, ot.SPECCODE, mw.WARDDESC, bd.BED_NAME, om.TARIFFID, ot.LABDPTCODE, pm.Patient_DOB, om.ORDEREDBY, om.REPORTTO, ot.SAMLECOLNO, ot.ORDERNO,SL.Sal_Desc,ISNULL(C.NAME,'')AS COMPNAME,  CONVERT(VARCHAR(10),OT.ORDERDATE,103)  +' ' +  CONVERT(VARCHAR(8),OT.ORDERTIME,108) as ORDERDATE, CONVERT(VARCHAR(10),OT.SAMCOLDATE,103)  +' ' +  CONVERT(VARCHAR(8),OT.SAMCOLTIME,108) as SAMPLECOLLDATE, CONVERT(VARCHAR(10),OT.RECEIVEDON,103)  +' ' +  CONVERT(VARCHAR(8),OT.RECEIVEDAT,108) as SAMPLERCVDDATE, CONVERT(VARCHAR(10),OT.RESULTDATE,103)  +' ' +  CONVERT(VARCHAR(8),OT.RESULTTIME,108) as RESULTENTERDATE, OT.RESULTNO,om.clnorgcode, BM.CRDCOMPCD AS CUSTOMERID,BM.REFDOCTCD,RM.RefDoctor_FName,BM.DOCTCD AS DOCTCODE,DM.Firstname AS DOCTNAME FROM DGL_ORDERTRN ot LEFT JOIN DGL_ORDERMST om on ot.ORDERNO=om.ORDERNO LEFT JOIN OPD_BILLMST BM ON BM.BILLNO=OM.BILLNO LEFT JOIN Mst_ReferralDoctor RM ON RM.RefDoct_ID=BM.REFDOCTCD LEFT JOIN Mst_DoctorMaster DM ON DM.CODE=BM.DOCTCD LEFT JOIN Patient_Master pm on om.MEDRECNO=pm.PatientMr_No INNER JOIN Mst_Salutation SL ON SL.Sal_Code=BM.SALUTNCODE LEFT JOIN MST_BED_DETAILS bd ON om.BEDNO=bd.BED_NAME  LEFT JOIN MST_WARDS mw ON om.WARDNO=mw.WARDDESC LEFT JOIN COMPANY C ON C.Com_Id=BM.CRDCOMPCD WHERE ot.SAMLECOLNO=@SampleCollectNo and ot.acceptanno=@AcceptnaceNo and ot.ORDERNO=@OrderNo  `;
 
     const params = { SampleCollectNo, AcceptnaceNo, OrderNo };
 
@@ -92,6 +92,9 @@ export default class resultEntryController {
         LabCode: r.LABCODE ?? "",
         MRNO: r.MEDRECNO ?? "",
         IPNO: r.IPNO ?? "",
+        OrderByCode: r.ORDEREDBY ?? "",
+        ReportToCode: r.REPORTTO ?? "",
+        Doct_Code: r.DOCTCODE ?? "",
         Age: r.AGE ?? "",
         Sex: r.SEX ?? "",
         PatName: r.PATNAME ?? "",
@@ -724,6 +727,11 @@ export default class resultEntryController {
     const MRNO = (input.mrno ?? input.MRNO ?? "").toString().trim();
     const IPNO = (input.ipno ?? input.IPNO ?? "").toString().trim();
     const PatName = (input.patname ?? input.PatName ?? "").toString().trim();
+    const Age = (input.age ?? input.AGE ?? "").toString().trim();
+    const Gender = (input.gender ?? input.Gender ?? input.SEX ?? "")
+      .toString()
+      .trim()
+      .toUpperCase();
     const CustomerId = (input.CustomerId ?? input.CUSTOMERID ?? "")
       .toString()
       .trim();
@@ -823,6 +831,20 @@ export default class resultEntryController {
     if (PatName) {
       whereClause += ` AND ISNULL(OM.PATNAME, '') LIKE '%' + @PATNAME + '%' `;
       params.PATNAME = PatName;
+    }
+
+    if (Age) {
+      whereClause += ` AND ISNULL(OM.AGE, '') LIKE '%' + @AGE + '%' `;
+      params.AGE = Age;
+    }
+
+    if (Gender === "") {
+      whereClause += `
+      AND UPPER(LTRIM(RTRIM(ISNULL(OM.SEX, '')))) IN ('M', 'F', 'T')`;
+    } else {
+      whereClause += `
+      AND UPPER(LTRIM(RTRIM(ISNULL(OM.SEX, '')))) = @GENDER`;
+      params.GENDER = Gender;
     }
 
     if (AcceptNo) {
