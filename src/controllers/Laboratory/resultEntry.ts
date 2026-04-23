@@ -375,6 +375,35 @@ export default class resultEntryController {
     }
   }
 
+  async getLabDepartments(req: Request, res: Response): Promise<void> {
+    try {
+      const sql = `
+      SELECT
+        LABDPTCODE,
+        LABDPTDESC
+      FROM DGL_LABDEPT
+      WHERE STATUS = 'A'
+      ORDER BY LABDPTDESC
+    `;
+
+      const { records } = await executeDbQuery(sql, {});
+
+      res.json({
+        status: 0,
+        d: records,
+      });
+      return;
+    } catch (error: any) {
+      console.error("getLabDepartments error", error);
+      res.json({
+        status: 1,
+        message: error?.message || "Failed to load lab departments",
+        d: [],
+      });
+      return;
+    }
+  }
+
   async getLabAdminWithSignature(req: Request, res: Response): Promise<void> {
     const input: any =
       (req.body && Object.keys(req.body).length ? req.body : req.query) || {};
@@ -777,9 +806,9 @@ export default class resultEntryController {
     }
 
     // Department
-    if (LabDeptCode) {
+    if (LabDeptCode && String(LabDeptCode).trim()) {
       whereClause += ` AND ISNULL(OT.LABDPTCODE, '') = @LABDPTCODE `;
-      params.LABDPTCODE = LabDeptCode;
+      params.LABDPTCODE = String(LabDeptCode).trim();
     }
 
     // Customer
