@@ -15,6 +15,16 @@ export default class resultEntryController {
     app.use("/lab", this.router);
 
     this.router.get(
+      "/getHospitalHeader",
+      authenticateToken,
+      this.getHospitalHeader.bind(this),
+    );
+    this.router.post(
+      "/showDetailsReport",
+      authenticateToken,
+      this.showDetailsReport.bind(this),
+    );
+    this.router.get(
       "/get_PatientDetails",
       authenticateToken,
       this.getPatientDetails.bind(this),
@@ -443,6 +453,82 @@ export default class resultEntryController {
       res.json({ status: 0, d: details });
     } catch (err: any) {
       res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  async getHospitalHeader(req: Request, res: Response): Promise<void> {
+    try {
+      const input: any =
+        (req.body && Object.keys(req.body).length ? req.body : req.query) || {};
+
+      const CLNORGCODE = String(
+        input.CLNORGCODE ||
+          input.Clnorgcode ||
+          input.clnorgcode ||
+          input.hospitalId ||
+          input.HospitalId ||
+          "",
+      ).trim();
+
+      if (!CLNORGCODE) {
+        res.status(400).json({
+          status: 1,
+          message: "CLNORGCODE is required",
+          d: {
+            HospitalName: "",
+            Address: "",
+            ContactNo: "",
+            Email: "",
+            LogoPath: "",
+            GSTNo: "",
+          },
+        });
+        return;
+      }
+
+      const query = `
+        SELECT TOP 1
+          ISNULL(CLINIC_NAME, '') AS HospitalName,
+          ISNULL(ADDRESS, '') AS Address,
+          ISNULL(PHONE, '') AS ContactNo,
+          ISNULL(EMAIL, '') AS Email,
+          ISNULL(IMAGE_PATH, '') AS LogoPath,
+          '' AS GSTNo
+        FROM TM_CLINICS
+        WHERE (CLNORGCODE = @CLNORGCODE OR CLINIC_CODE = @CLNORGCODE)
+          AND ISNULL(STATUS, 'A') = 'A'
+        ORDER BY
+          CASE WHEN CLINIC_CODE = @CLNORGCODE THEN 0 ELSE 1 END,
+          CLINIC_NAME
+      `;
+
+      const { records } = await executeDbQuery(query, { CLNORGCODE });
+
+      res.json({
+        status: 0,
+        d: records?.[0] || {
+          HospitalName: "",
+          Address: "",
+          ContactNo: "",
+          Email: "",
+          LogoPath: "",
+          GSTNo: "",
+        },
+      });
+    } catch (err: any) {
+      console.error("getHospitalHeader error:", err);
+      res.status(500).json({
+        status: 1,
+        message: err?.message || "Failed to load hospital header",
+        d: {
+          HospitalName: "",
+          Address: "",
+          ContactNo: "",
+          Email: "",
+          LogoPath: "",
+          GSTNo: "",
+        },
+      });
     }
   }
 
@@ -1067,6 +1153,178 @@ export default class resultEntryController {
       res.status(500).json({
         status: 1,
         message: err?.message || "Failed to fetch result list",
+      });
+    }
+  }
+  async showDetailsReport(req: Request, res: Response): Promise<void> {
+    const input: any =
+      (req.body && Object.keys(req.body).length ? req.body : req.query) || {};
+
+    const FROMDATE = (input.FROMDATE ?? input.fromDate ?? "").toString().trim();
+    const TODATE = (input.TODATE ?? input.toDate ?? "").toString().trim();
+    const SAMPLESTATUS = (input.SAMPLESTATUS ?? "").toString().trim();
+    const CUSTOMERID = (input.CUSTOMERID ?? "").toString().trim();
+    const DEPTCODE = (input.DEPTCODE ?? "").toString().trim();
+    const CLNORGCODE = (input.CLNORGCODE ?? input.Clnorgcode ?? "")
+      .toString()
+      .trim();
+
+    if (!FROMDATE || !TODATE) {
+      res.status(400).json({
+        status: 1,
+        message: "FROMDATE and TODATE are required",
+        d: [],
+      });
+      return;
+    }
+
+    let whereClause = `
+    WHERE OM.ORDERDATE >= CONVERT(datetime, @FROMDATE, 120)
+      AND OM.ORDERDATE < DATEADD(DAY, 1, CONVERT(datetime, @TODATE, 120))
+  `;
+
+    const params: any = {
+      FROMDATE,
+      TODATE,
+    };
+
+    if (SAMPLESTATUS === "RE") {
+      whereClause += ` AND TR.RESUSTATUS = 'RE' `;
+    } else if (SAMPLESTATUS === "RV") {
+      whereClause += ` AND TR.RESUSTATUS = 'RV' `;
+    } else if (SAMPLESTATUS === "RD") {
+      whereClause += ` AND TR.RESUSTATUS = 'RD' AND ISNULL(TR.PRINTEDYN, 'N') <> 'Y' `;
+    } else if (SAMPLESTATUS === "RP") {
+      whereClause += ` AND TR.RESUSTATUS = 'RD' AND ISNULL(TR.PRINTEDYN, 'N') = 'Y' `;
+    } else if (SAMPLESTATUS) {
+      whereClause += ` AND OT.SAMPLESTATUS = @SAMPLESTATUS `;
+      params.SAMPLESTATUS = SAMPLESTATUS;
+    }
+
+    if (CUSTOMERID) {
+      whereClause += ` AND ISNULL(OM.CUSTOMERID, '') = @CUSTOMERID `;
+      params.CUSTOMERID = CUSTOMERID;
+    }
+
+    if (DEPTCODE) {
+      whereClause += ` AND ISNULL(OT.LABDPTCODE, '') = @DEPTCODE `;
+      params.DEPTCODE = DEPTCODE;
+    }
+
+    if (CLNORGCODE) {
+      whereClause += ` AND ISNULL(OM.CLNORGCODE, '') = @CLNORGCODE `;
+      params.CLNORGCODE = CLNORGCODE;
+    }
+
+    const query = `
+  SELECT
+    ISNULL(OM.MEDRECNO, '') AS MEDRECNO,
+    '' AS CUSTOMER,
+    ISNULL(OM.PATNAME, '') AS PATNAME,
+    ISNULL(OM.AGE, '') AS AGE,
+    ISNULL(OM.SEX, '') AS SEX,
+    ISNULL(OT.ORDERNO, '') AS ORDERNO,
+    CONVERT(VARCHAR(10), OM.ORDERDATE, 120) AS ORDERDATE,
+    ISNULL(DT.TESTNAME, '') AS TESTNAME,
+
+    CASE
+      WHEN OT.SAMPLESTATUS = 'OP' THEN 'Order Pending'
+      WHEN OT.SAMPLESTATUS = 'C' THEN 'Order Cancelled'
+      WHEN OT.SAMPLESTATUS = 'SA' THEN 'Sample Acceptance'
+      WHEN OT.SAMPLESTATUS = 'SC' THEN 'Sample Collected'
+      WHEN OT.SAMPLESTATUS = 'SR' THEN 'Sample Received'
+      WHEN OT.SAMPLESTATUS = 'OR' THEN 'Sample Rejected'
+      WHEN TR.RESUSTATUS = 'RE' THEN 'Result Entered'
+      WHEN TR.RESUSTATUS = 'RV' THEN 'Result Verified'
+      WHEN TR.RESUSTATUS = 'RD' AND ISNULL(TR.PRINTEDYN, 'N') <> 'Y' THEN 'Result Delivered'
+      WHEN TR.RESUSTATUS = 'RD' AND ISNULL(TR.PRINTEDYN, 'N') = 'Y' THEN 'Report Printed'
+      WHEN OT.SAMPLESTATUS = 'RE' THEN 'Result Entered'
+      ELSE ISNULL(OT.SAMPLESTATUS, '')
+    END AS ORDER_STATUS,
+
+    ISNULL(OT.SAMLECOLNO, '') AS SAMLECOLNO,
+
+    CASE
+      WHEN OT.SAMCOLDATE IS NOT NULL
+      THEN CONVERT(VARCHAR(10), OT.SAMCOLDATE, 103) + ' ' + CONVERT(VARCHAR(8), OT.SAMCOLTIME, 108)
+      ELSE ''
+    END AS SAMPLECOLLDATE,
+
+    ISNULL(SU.USERNAME, '') AS SAMPLECOLLECTEDBY,
+
+    CASE
+      WHEN OT.RECEIVEDON IS NOT NULL
+      THEN CONVERT(VARCHAR(10), OT.RECEIVEDON, 103) + ' ' + CONVERT(VARCHAR(8), OT.RECEIVEDAT, 108)
+      ELSE ''
+    END AS RECEIVEDDATE,
+
+    ISNULL(RC.USERNAME, '') AS RECEIVEDBY,
+    ISNULL(OT.ACCEPTANNO, '') AS ACCEPTANNO,
+
+    CASE
+      WHEN OT.ACCEPTEDON IS NOT NULL
+      THEN CONVERT(VARCHAR(10), OT.ACCEPTEDON, 103) + ' ' + CONVERT(VARCHAR(8), OT.ACCEPTEDAT, 108)
+      ELSE ''
+    END AS ACCEPTEDDATE,
+
+    ISNULL(AC.USERNAME, '') AS ACCEPTEDBY,
+    ISNULL(TR.RESULTNO, '') AS RESULTNO,
+
+    CASE
+      WHEN TR.RESULTDATE IS NOT NULL
+      THEN CONVERT(VARCHAR(20), TR.RESULTDATE, 120)
+      ELSE ''
+    END AS RESULTDATE,
+
+    CASE
+      WHEN TR.VERIFIEDON IS NOT NULL
+        AND TR.VERIFIEDON <> '1900-01-01 00:00:00.000'
+      THEN CONVERT(VARCHAR(20), TR.VERIFIEDON, 120)
+      ELSE ''
+    END AS VERIFIEDDATE,
+
+    CASE
+      WHEN TR.DELIVEREON IS NOT NULL
+      THEN CONVERT(VARCHAR(20), TR.DELIVEREON, 120)
+      ELSE ''
+    END AS DELIVERYDATE,
+
+    ISNULL(OM.CLNORGCODE, '') AS CLINIC,
+    ISNULL(OT.TESTCODE, '') AS TESTCODE,
+    ISNULL(DT.RESTYPECD, '') AS RESTYPECD
+
+  FROM DGL_ORDERMST OM
+  INNER JOIN DGL_ORDERTRN OT
+    ON OT.ORDERNO = OM.ORDERNO
+  INNER JOIN DGL_TESTMASTER DT
+    ON DT.TESTCODE = OT.TESTCODE
+  LEFT JOIN Mst_UserDetails SU
+    ON OT.SAMLECOLBY = SU.USERID
+  LEFT JOIN Mst_UserDetails RC
+    ON OT.RECEIVEDBY = RC.USERID
+  LEFT JOIN Mst_UserDetails AC
+    ON OT.ACCEPTEDBY = AC.USERID
+  LEFT JOIN DGL_RESULTMST TR
+    ON OT.ORDERNO = TR.ORDERNO
+    AND OT.SAMLECOLNO = TR.SAMLECOLNO
+    AND OT.ACCEPTANNO = TR.ACCEPTANNO
+  ${whereClause}
+  ORDER BY OM.ORDERDATE, OM.MEDRECNO
+`;
+
+    try {
+      const { records } = await executeDbQuery(query, params);
+
+      res.json({
+        status: 0,
+        d: records || [],
+      });
+    } catch (err: any) {
+      console.error("showDetailsReport error:", err);
+      res.status(500).json({
+        status: 1,
+        message: err?.message || "Failed to load lab work list",
+        d: [],
       });
     }
   }
