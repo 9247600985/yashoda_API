@@ -306,7 +306,7 @@ async bindUsers(req: Request, res: Response): Promise<void> {
 
       const sql = `
       SELECT
-        PD.PAYMODE AS BILLPAYMODE,
+        PD.PAYMODE AS BILLPAYMODE,OH.BILLNO,
         CASE WHEN (OD.PATCNAMT+OD.COMCNAMT)!=0 THEN PD_RF.PAYMODE ELSE '' END AS RF_PAYMODE,
         OH.DOCTCD,
         DM1.FIRSTNAME,
