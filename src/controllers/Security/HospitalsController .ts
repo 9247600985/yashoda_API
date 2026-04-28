@@ -1,4 +1,3 @@
-
 import express, { Request, Response, Router } from "express";
 import { executeDbQuery } from "../../db";
 import { authenticateToken } from "../../utilities/authMiddleWare";
@@ -17,7 +16,6 @@ export default class HospitalsController {
     this.router.get("/getCompCode",     authenticateToken, this.getCompCode.bind(this));
   }
 
- 
   async getHospitals(req: Request, res: Response) {
     try {
       const { records } = await executeDbQuery(`
@@ -29,9 +27,9 @@ export default class HospitalsController {
       const data = records.map((r: any) => ({
         CODE:     r.Hospital_Id,
         NAME:     r.HospitalName,
-        ADDRESS1: r.Address  || '',
-        ADDRESS2: r.Phone_No || '',
-        AllowSMS: r.AllowSMS || '',
+        ADDRESS1: r.Address   || '',
+        ADDRESS2: r.Phone_No  || '',
+        AllowSMS: r.AllowSMS  || '',
         STATUS:   r.STATUS === 'A' ? 'Active' : 'Inactive'
       }));
 
@@ -42,34 +40,32 @@ export default class HospitalsController {
     }
   }
 
- 
   async insertHospital(req: Request, res: Response) {
     try {
-      const d = req.body;
-      const s = (val: any, len: number) => (val || '').toString().trim().substring(0, len);
+      const d    = req.body;
+      const user = (req as any).user?.userId || (req as any).user?.username || 'system';
+      const s    = (val: any, len: number) => (val || '').toString().trim().substring(0, len);
 
-      const HospitalId       = s(d.HospitalId,       12);
-      const HospitalName     = s(d.HospitalName,     50);
-      const ShortName        = s(d.HospitalName,      3);  
-      const Phone_No         = s(d.Phone_No,         50);
-      const Address          = s(d.Address,         200);
-      const STATUS           = s(d.STATUS,            1);
-      const AllowSMS         = s(d.AllowSMS,          1);
-      const Purchase_Company = s(d.Purchase_Company, 20);
-      const Created_By       = s(d.Created_By,       50);
+      const HospitalId   = s(d.HospitalId,   12);
+      const HospitalName = s(d.HospitalName, 50);
+      const ShortName    = s(d.HospitalName,  3);
+      const Phone_No     = s(d.Phone_No,     50);
+      const Address      = s(d.Address,     200);
+      const STATUS       = s(d.STATUS,        1);
+      const AllowSMS     = s(d.AllowSMS,      1);
 
-   
+     
       const { records: dupCheck } = await executeDbQuery(`
         SELECT COUNT(*) as CNT FROM HospitalsList
-        WHERE Hospital_Id = @HospitalId
-      `, { HospitalId });
+        WHERE Hospital_Id = @HospitalId AND Address = @Address
+      `, { HospitalId, Address });
 
       if (dupCheck[0]?.CNT > 0) {
         res.json({ status: 0, d: 0 });
         return;
       }
 
-
+      
       await executeDbQuery(`
         INSERT INTO HospitalsList (
           Hospital_Id,
@@ -91,18 +87,6 @@ export default class HospitalsController {
       `, { HospitalId, HospitalName, ShortName, Phone_No, Address, STATUS, AllowSMS });
 
      
-      try {
-        await executeDbQuery(`
-          INSERT INTO INV_PURCOMP_CLINICLINK
-            (CLNORGCODE, COMP_ID, CLINIC_ID, Created_By, Created_On, Status)
-          VALUES
-            (@HospitalId, @Purchase_Company, @HospitalId, @Created_By, GETDATE(), 'A')
-        `, { HospitalId, Purchase_Company, Created_By });
-      } catch (linkErr: any) {
-        console.warn("INV_PURCOMP_CLINICLINK insert skipped:", linkErr.message);
-      }
-
-   
       try {
         const { records: finYearRec } = await executeDbQuery(`
           SELECT FinYear FROM Mst_AccYear
@@ -144,7 +128,7 @@ export default class HospitalsController {
       `, {
         HospitalId:   s(d.HospitalId,   12),
         HospitalName: s(d.HospitalName, 50),
-        ShortName:    s(d.HospitalName,  3),  
+        ShortName:    s(d.HospitalName,  3),
         Phone_No:     s(d.Phone_No,     50),
         Address:      s(d.Address,     200),
         STATUS:       s(d.STATUS,        1),
@@ -157,7 +141,6 @@ export default class HospitalsController {
       res.status(500).json({ status: 1, message: error.message || "Failed to update hospital" });
     }
   }
-
 
   async cancelHospital(req: Request, res: Response) {
     try {
@@ -177,25 +160,6 @@ export default class HospitalsController {
   }
 
   async getCompCode(req: Request, res: Response) {
-    try {
-      const { HospitalId } = req.query;
-
-      try {
-        const { records } = await executeDbQuery(`
-          SELECT ISNULL(COMP_ID, '') AS COMP_ID
-          FROM INV_PURCOMP_CLINICLINK
-          WHERE CLINIC_ID = @HospitalId
-        `, { HospitalId });
-
-        res.json({ status: 0, d: records[0]?.COMP_ID || '' });
-      } catch (linkErr: any) {
-        console.warn("INV_PURCOMP_CLINICLINK query skipped:", linkErr.message);
-        res.json({ status: 0, d: '' });
-      }
-
-    } catch (error: any) {
-      console.error("Error in getCompCode:", error);
-      res.status(500).json({ status: 1, message: error.message || "Failed to get company code" });
-    }
+    res.json({ status: 0, d: '' });
   }
 }
