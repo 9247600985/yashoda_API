@@ -158,26 +158,30 @@ export default class sampleCollectionController {
 
   async getLabDepartments(req: Request, res: Response): Promise<void> {
     try {
-      const hospitalId = String(req.query.hospitalId || "");
-      const labType = String(req.query.labType || "");
-
-      const sqlQuery = `
-      SELECT LABDPTCODE AS id, LABDPTDESC AS name
+      const sql = `
+      SELECT
+        LABDPTCODE,
+        LABDPTDESC
       FROM DGL_LABDEPT
       WHERE STATUS = 'A'
-        AND LABTYPE = @labType
-        AND CLNORGCODE = @hospitalId
       ORDER BY LABDPTDESC
     `;
 
-      const { records } = await executeDbQuery(sqlQuery, {
-        hospitalId,
-        labType,
-      });
+      const { records } = await executeDbQuery(sql, {});
 
-      res.json({ status: 0, d: records });
-    } catch (err: any) {
-      res.status(500).json({ status: 1, message: err.message });
+      res.json({
+        status: 0,
+        d: records,
+      });
+      return;
+    } catch (error: any) {
+      console.error("getLabDepartments error", error);
+      res.json({
+        status: 1,
+        message: error?.message || "Failed to load lab departments",
+        d: [],
+      });
+      return;
     }
   }
 

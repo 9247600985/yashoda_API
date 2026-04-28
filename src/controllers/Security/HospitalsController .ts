@@ -1,3 +1,4 @@
+
 import express, { Request, Response, Router } from "express";
 import { executeDbQuery } from "../../db";
 import { authenticateToken } from "../../utilities/authMiddleWare";
@@ -9,98 +10,192 @@ export default class HospitalsController {
   constructor(private app: Router) {
     app.use("/hospitals", this.router);
 
-    this.router.get("/getHospitals", authenticateToken, this.getHospitals.bind(this));
+    this.router.get("/getHospitals",    authenticateToken, this.getHospitals.bind(this));
     this.router.post("/insertHospital", authenticateToken, this.insertHospital.bind(this));
-    this.router.put("/updateHospital", authenticateToken, this.updateHospital.bind(this));
-    this.router.put("/cancelHospital", authenticateToken, this.cancelHospital.bind(this));
-    this.router.get("/getCompCode", authenticateToken, this.getCompCode.bind(this));
+    this.router.put("/updateHospital",  authenticateToken, this.updateHospital.bind(this));
+    this.router.put("/cancelHospital",  authenticateToken, this.cancelHospital.bind(this));
+    this.router.get("/getCompCode",     authenticateToken, this.getCompCode.bind(this));
   }
 
+ 
   async getHospitals(req: Request, res: Response) {
-    const query = `SELECT * FROM HospitalsList`;
-    const { records } = await executeDbQuery(query);
+    try {
+      const { records } = await executeDbQuery(`
+        SELECT Hospital_Id, HospitalName, Address, STATUS, Phone_No, AllowSMS
+        FROM HospitalsList
+        ORDER BY HospitalName
+      `);
 
-    const data = records.map((r: any) => ({
-      CODE: r.Hospital_Id,
-      NAME: r.HospitalName,
-      ADDRESS1: r.Address,
-      ADDRESS2: r.Phone_No,
-      STATUS: r.STATUS === 'A' ? 'Active' : 'Inactive'
-    }));
+      const data = records.map((r: any) => ({
+        CODE:     r.Hospital_Id,
+        NAME:     r.HospitalName,
+        ADDRESS1: r.Address  || '',
+        ADDRESS2: r.Phone_No || '',
+        AllowSMS: r.AllowSMS || '',
+        STATUS:   r.STATUS === 'A' ? 'Active' : 'Inactive'
+      }));
 
-    res.json({ status: 0, d: data });
+      res.json({ status: 0, d: data });
+    } catch (error: any) {
+      console.error("Error in getHospitals:", error);
+      res.status(500).json({ status: 1, message: error.message || "Failed to fetch hospitals" });
+    }
   }
 
+ 
   async insertHospital(req: Request, res: Response) {
+    try {
+      const d = req.body;
+      const s = (val: any, len: number) => (val || '').toString().trim().substring(0, len);
 
-    const d = req.body;
+      const HospitalId       = s(d.HospitalId,       12);
+      const HospitalName     = s(d.HospitalName,     50);
+      const ShortName        = s(d.HospitalName,      3);  
+      const Phone_No         = s(d.Phone_No,         50);
+      const Address          = s(d.Address,         200);
+      const STATUS           = s(d.STATUS,            1);
+      const AllowSMS         = s(d.AllowSMS,          1);
+      const Purchase_Company = s(d.Purchase_Company, 20);
+      const Created_By       = s(d.Created_By,       50);
 
-    await executeDbQuery(`
-      INSERT INTO HospitalsList
-      (Hospital_Id, HospitalName, Phone_No, Address, Email, Website, GST_No, STATUS, AllowSMS, Image)
-      VALUES
-      (@HospitalId, @HospitalName, @Phone_No, @Address, @Email, @Website, @GST_No, @STATUS, @AllowSMS, @Image)
-    `, d);
+   
+      const { records: dupCheck } = await executeDbQuery(`
+        SELECT COUNT(*) as CNT FROM HospitalsList
+        WHERE Hospital_Id = @HospitalId
+      `, { HospitalId });
 
-    await executeDbQuery(`
-      INSERT INTO INV_PURCOMP_CLINICLINK
-      (CLINIC_ID, COMP_ID)
-      VALUES (@HospitalId, @Purchase_Company)
-    `, d);
+      if (dupCheck[0]?.CNT > 0) {
+        res.json({ status: 0, d: 0 });
+        return;
+      }
 
-    res.json({ status: 0 });
+
+      await executeDbQuery(`
+        INSERT INTO HospitalsList (
+          Hospital_Id,
+          HospitalName,
+          SHORTNAME,
+          Phone_No,
+          Address,
+          STATUS,
+          AllowSMS
+        ) VALUES (
+          @HospitalId,
+          @HospitalName,
+          @ShortName,
+          @Phone_No,
+          @Address,
+          @STATUS,
+          @AllowSMS
+        )
+      `, { HospitalId, HospitalName, ShortName, Phone_No, Address, STATUS, AllowSMS });
+
+     
+      try {
+        await executeDbQuery(`
+          INSERT INTO INV_PURCOMP_CLINICLINK
+            (CLNORGCODE, COMP_ID, CLINIC_ID, Created_By, Created_On, Status)
+          VALUES
+            (@HospitalId, @Purchase_Company, @HospitalId, @Created_By, GETDATE(), 'A')
+        `, { HospitalId, Purchase_Company, Created_By });
+      } catch (linkErr: any) {
+        console.warn("INV_PURCOMP_CLINICLINK insert skipped:", linkErr.message);
+      }
+
+   
+      try {
+        const { records: finYearRec } = await executeDbQuery(`
+          SELECT FinYear FROM Mst_AccYear
+          WHERE CurrentFinancialYear = 'y' AND OpenStatus = 'o'
+        `, {});
+
+        const FinYear = (finYearRec[0]?.FinYear || '').toString().trim();
+        if (FinYear) {
+          await executeDbQuery(`
+            EXEC USB_CLINIC_DOCNO_INSERT @CLNORGCODE, @FINYEAR
+          `, { CLNORGCODE: HospitalId, FINYEAR: FinYear });
+        }
+      } catch (spErr: any) {
+        console.warn("USB_CLINIC_DOCNO_INSERT skipped:", spErr.message);
+      }
+
+      res.json({ status: 0, d: 1 });
+
+    } catch (error: any) {
+      console.error("Error in insertHospital:", error);
+      res.status(500).json({ status: 1, message: error.message || "Failed to insert hospital" });
+    }
   }
 
   async updateHospital(req: Request, res: Response) {
+    try {
+      const d = req.body;
+      const s = (val: any, len: number) => (val || '').toString().trim().substring(0, len);
 
-    const d = req.body;
+      await executeDbQuery(`
+        UPDATE HospitalsList SET
+          HospitalName = @HospitalName,
+          SHORTNAME    = @ShortName,
+          Phone_No     = @Phone_No,
+          Address      = @Address,
+          Status       = @STATUS,
+          AllowSMS     = @AllowSMS
+        WHERE Hospital_Id = @HospitalId
+      `, {
+        HospitalId:   s(d.HospitalId,   12),
+        HospitalName: s(d.HospitalName, 50),
+        ShortName:    s(d.HospitalName,  3),  
+        Phone_No:     s(d.Phone_No,     50),
+        Address:      s(d.Address,     200),
+        STATUS:       s(d.STATUS,        1),
+        AllowSMS:     s(d.AllowSMS,      1),
+      });
 
-    await executeDbQuery(`
-      UPDATE HospitalsList SET
-      HospitalName=@HospitalName,
-      Phone_No=@Phone_No,
-      Address=@Address,
-      Email=@Email,
-      Website=@Website,
-      GST_No=@GST_No,
-      STATUS=@STATUS,
-      AllowSMS=@AllowSMS,
-      Image=@Image
-      WHERE Hospital_Id=@HospitalId
-    `, d);
-
-    await executeDbQuery(`
-      UPDATE INV_PURCOMP_CLINICLINK
-      SET COMP_ID=@Purchase_Company
-      WHERE CLINIC_ID=@HospitalId
-    `, d);
-
-    res.json({ status: 0 });
+      res.json({ status: 0, d: 1 });
+    } catch (error: any) {
+      console.error("Error in updateHospital:", error);
+      res.status(500).json({ status: 1, message: error.message || "Failed to update hospital" });
+    }
   }
 
+
   async cancelHospital(req: Request, res: Response) {
-    const { HospitalId, STATUS } = req.body;
+    try {
+      const HospitalId = (req.body.HospitalId || '').toString().trim().substring(0, 12);
+      const STATUS     = (req.body.STATUS     || 'I').toString().trim().substring(0, 1);
 
-    await executeDbQuery(`
-      UPDATE HospitalsList SET STATUS=@STATUS
-      WHERE Hospital_Id=@HospitalId
-    `, { HospitalId, STATUS });
+      await executeDbQuery(`
+        UPDATE HospitalsList SET Status = @STATUS
+        WHERE Hospital_Id = @HospitalId
+      `, { HospitalId, STATUS });
 
-    res.json({ status: 0 });
+      res.json({ status: 0, d: 1 });
+    } catch (error: any) {
+      console.error("Error in cancelHospital:", error);
+      res.status(500).json({ status: 1, message: error.message || "Failed to cancel hospital" });
+    }
   }
 
   async getCompCode(req: Request, res: Response) {
+    try {
+      const { HospitalId } = req.query;
 
-    const { HospitalId } = req.query;
+      try {
+        const { records } = await executeDbQuery(`
+          SELECT ISNULL(COMP_ID, '') AS COMP_ID
+          FROM INV_PURCOMP_CLINICLINK
+          WHERE CLINIC_ID = @HospitalId
+        `, { HospitalId });
 
-    const { records } = await executeDbQuery(`
-      SELECT COMP_ID FROM INV_PURCOMP_CLINICLINK
-      WHERE CLINIC_ID=@HospitalId
-    `, { HospitalId });
+        res.json({ status: 0, d: records[0]?.COMP_ID || '' });
+      } catch (linkErr: any) {
+        console.warn("INV_PURCOMP_CLINICLINK query skipped:", linkErr.message);
+        res.json({ status: 0, d: '' });
+      }
 
-    res.json({
-      status: 0,
-      d: records[0]?.COMP_ID || ''
-    });
+    } catch (error: any) {
+      console.error("Error in getCompCode:", error);
+      res.status(500).json({ status: 1, message: error.message || "Failed to get company code" });
+    }
   }
 }
