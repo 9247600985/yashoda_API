@@ -51,8 +51,8 @@ export default class serviceController {
   }
 }
 async getServiceRateDetails(req: Request, res: Response) {
-  const { code, CLNORGCODE, REVISIONID } = req.query;
- const orgCode = CLNORGCODE as string;
+  const { code, CLNORGCODE } = req.query;
+
   const sql = `
     SELECT DISTINCT 
       SC.SERVICECOST,
@@ -63,23 +63,18 @@ async getServiceRateDetails(req: Request, res: Response) {
     LEFT JOIN MST_BEDCATGMST BD 
       ON BD.BEDCATGCD = SC.BEDCATGCODE
     WHERE SC.SERVCODE = @code
-      AND SC.TARIFFID = '001'    
-      AND SC.REVISIONID = @REVISIONID  
+      AND SC.TARIFFID = '001'
       AND SC.BEDCATGCODE IN (
         SELECT BEDCATGCD 
         FROM MST_BEDCATGMST 
-        WHERE CLNORGCODE = @CLNORGCODE 
-          AND REC_STATUS = 'A'
+        WHERE REC_STATUS = 'A'
       )
   `;
+ 
 
   try {
-    const { records } = await executeDbQuery(sql, {
-      code,
-      CLNORGCODE: orgCode,
-      REVISIONID
-    });
-
+    const { records } = await executeDbQuery(sql, { code });
+   
     res.json({ status: 0, d: records });
   } catch (err: any) {
     res.status(500).json({ status: 1, message: err.message });
