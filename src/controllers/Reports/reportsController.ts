@@ -148,195 +148,344 @@ export default class reportsController {
       });
     }
   }
-  
-async AccountReport(req: Request, res: Response): Promise<void> {
-  const input: any = req.method === "GET" ? req.query : req.body;
 
-  const pageNo = Math.max(Number(input.PageNo || 1), 1);
-  const pageSize = Math.min(Math.max(Number(input.PageSize || 200), 20), 1000);
-  const offset = (pageNo - 1) * pageSize;
+  async AccountReport(req: Request, res: Response): Promise<void> {
+    const input: any = req.method === "GET" ? req.query : req.body;
 
-  const billNo = String(input.Bill_number || "").trim();
-  const hasBillNo = billNo.length > 0;
+    const pageNo = Math.max(Number(input.PageNo || 1), 1);
+    const pageSize = Math.min(
+      Math.max(Number(input.PageSize || 200), 20),
+      1000,
+    );
+    const offset = (pageNo - 1) * pageSize;
 
-  const paymode = String(input.paymode || "").trim();
-  const clinicCode = String(input.Clinic_Code || "").trim();
+    const billNo = String(input.Bill_number || "").trim();
+    const hasBillNo = billNo.length > 0;
 
-  const fromDate = input.FROMDATE ? new Date(input.FROMDATE) : null;
-  const toDate = input.TODATE ? new Date(input.TODATE) : null;
+    const paymode = String(input.paymode || "").trim();
+    const clinicCode = String(input.Clinic_Code || "").trim();
 
-  let sql = "";
+    const fromDate = input.FROMDATE ? new Date(input.FROMDATE) : null;
+    const toDate = input.TODATE ? new Date(input.TODATE) : null;
 
-  const commonDateOrBillFilter = hasBillNo
-    ? ` AND OH.BILLNO LIKE @Bill_number `
-    : ` AND OH.BILLDATE >= @FromDate
-        AND OH.BILLDATE < DATEADD(day, 1, @ToDate) `;
+    try {
+      if (!hasBillNo && (!fromDate || !toDate)) {
+        res.status(400).json({
+          status: 1,
+          result: "Please select From Date and To Date or enter Bill No",
+        });
+        return;
+      }
 
-  const clinicFilter = clinicCode
-    ? ` AND T.CLINIC_CODE LIKE @Clinic_Code `
-    : ` `;
-
-  if (paymode === "001") {
-    sql = `
-      WITH Grouped AS (
-        SELECT
-          'MA1/' + CONVERT(varchar(4), YEAR(MIN(OH.BILLDATE)))
-            + '-' + RIGHT(CONVERT(varchar(4), YEAR(MIN(OH.BILLDATE)) + 1), 2)
-            + '/MCR-' + CAST(A.ACCODE AS varchar(20)) DocNo,
-          CONVERT(varchar(20), OH.BILLDATE, 103) Date,
-          'MAIN CASH - ' + ISNULL(T.ACC_CLINIC_NAME_CASH, '') CashBankAC,
-          'MA1' Division,
-          'MCR' Receipt_Type,
-          ISNULL(A.ACCREM, '') + ISNULL(T.ACC_CLINIC_NAME_CASH, '') 
-            + '(' + CONVERT(varchar(20), OH.BILLDATE, 103) + ')' sNarration,
-          A.ACCODE Account,
-          ROUND(COALESCE(SUM(OD.AMOUNT - (OD.SERDISCOUNT + OD.PATCNAMT)), 0), 0) Amount,
-          MIN(CAST(OH.BILLDATE AS date)) BillDateSort
-        FROM OPD_BILLMST OH
-        LEFT JOIN OPD_BILLTRN OD ON OH.BILLNO = OD.BILLNO
-        LEFT JOIN MST_SERVICES S ON OD.SERVCODE = S.SERVCODE
-        LEFT JOIN MST_ACCOUNTS A ON A.ACCODE = S.ACCODE
-        OUTER APPLY (
-          SELECT TOP 1
-            ACC_CLINIC_NAME_CASH,
-            ACC_CLINIC_NAME,
-            ACC_SHORT_NAME,
-            ACC2CARDREM,
-            ACC2UPIREM,
-            CLINIC_CODE
-          FROM TM_CLINICS
-          WHERE CLNORGCODE = OD.CLNORGCODE
-        ) T
-        WHERE
-          OH.PAYMODE = '001'
-          ${commonDateOrBillFilter}
-          ${clinicFilter}
-        GROUP BY
-          CONVERT(varchar(20), OH.BILLDATE, 103),
-          T.ACC_CLINIC_NAME_CASH,
-          A.ACCREM,
-          A.ACCODE
-        HAVING ROUND(COALESCE(SUM(OD.AMOUNT - (OD.SERDISCOUNT + OD.PATCNAMT)), 0), 0) <> 0
+      const amountExpression = `
+      ROUND(
+        SUM(
+          ISNULL(OD.AMOUNT, 0)
+          - (ISNULL(OD.SERDISCOUNT, 0) + ISNULL(OD.PATCNAMT, 0))
+        ),
+        0
       )
-      SELECT
-        DocNo, Date, CashBankAC, Division, Receipt_Type, sNarration, Account, Amount,
-        COUNT(1) OVER() TotalRows,
-        SUM(Amount) OVER() GrandTotal
-      FROM Grouped
-      ORDER BY CashBankAC, BillDateSort
-      OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
     `;
-  } else {
-    sql = `
-      WITH Grouped AS (
+
+      const clinicFilter = clinicCode
+        ? ` AND ISNULL(T.CLINIC_CODE, '') LIKE @Clinic_Code `
+        : ` `;
+
+      let sql = "";
+
+      if (hasBillNo) {
+        sql = `
+        WITH BillRows AS (
+          SELECT
+            ISNULL(OH.BILLNO, '') INV_NO,
+            ISNULL(OH.RCPTNO, '') RCTNO,
+            CONVERT(varchar(20), OH.BILLDATE, 103) Date,
+            CONVERT(varchar(20), OH.BILLDATE, 103) DATES,
+            ISNULL(S.ACCODE, '') CODE,
+            ISNULL(A.ACDESCR, '') NAME,
+            CASE 
+              WHEN OH.PAYMODE = '001' THEN 'CASH'
+              WHEN OH.PAYMODE = '002' THEN 'CHQ'
+              WHEN OH.PAYMODE IN ('004', '005', '006') THEN 'CARD'
+              ELSE 'UPI'
+            END MODE_OF_PAYMENT,
+            '' CASH,
+            '' CARD,
+            '' BANK,
+            ${amountExpression} Amount,
+            ISNULL(OH.SCROLLNO, '') SETTLEMENTNO,
+            ISNULL(T.ACC_SHORT_NAME, '') + ' ' +
+              CASE 
+                WHEN OH.PAYMODE = '001' THEN ISNULL(T.ACC_CLINIC_NAME_CASH, '')
+                WHEN OH.PAYMODE = '002' THEN 'CHQ ' + ISNULL(T.ACC_CLINIC_NAME, '')
+                WHEN OH.PAYMODE IN ('004', '005', '006') THEN ISNULL(T.ACC2CARDREM, '') + ISNULL(T.ACC_CLINIC_NAME, '')
+                ELSE ISNULL(T.ACC2UPIREM, '') + ISNULL(T.ACC_CLINIC_NAME, '')
+              END ACCOUNT2,
+            ISNULL(OH.CHEQUEDDNO, '') CHEQUE_NO,
+            CASE 
+              WHEN OH.CHEQUEDATE IS NULL OR CONVERT(date, OH.CHEQUEDATE) = '1900-01-01'
+              THEN ''
+              ELSE CONVERT(varchar(10), OH.CHEQUEDATE, 103)
+            END CHEQUE_DT,
+            ISNULL(A.ACCREM, '') + 
+              CASE 
+                WHEN OH.PAYMODE = '001' THEN ISNULL(T.ACC_CLINIC_NAME_CASH, '')
+                ELSE ISNULL(T.ACC_CLINIC_NAME, '')
+              END + '(' + CONVERT(varchar(20), OH.BILLDATE, 103) + ')' NARRATION,
+            ISNULL(OH.REMARKS, '') REMARKS,
+            MIN(CAST(OH.BILLDATE AS date)) BillDateSort
+          FROM OPD_BILLMST OH
+          LEFT JOIN OPD_BILLTRN OD ON OH.BILLNO = OD.BILLNO
+          LEFT JOIN MST_SERVICES S ON OD.SERVCODE = S.SERVCODE
+          LEFT JOIN MST_ACCOUNTS A ON A.ACCODE = S.ACCODE
+          OUTER APPLY (
+            SELECT TOP 1
+              ACC_CLINIC_NAME_CASH,
+              ACC_CLINIC_NAME,
+              ACC_SHORT_NAME,
+              ACC2CARDREM,
+              ACC2UPIREM,
+              CLINIC_CODE
+            FROM TM_CLINICS
+            WHERE CLNORGCODE = ISNULL(OD.CLNORGCODE, OH.CLNORGCODE)
+          ) T
+          WHERE
+            (
+              OH.BILLNO LIKE @Bill_number
+              OR OH.RCPTNO LIKE @Bill_number
+            )
+            ${clinicFilter}
+          GROUP BY
+            OH.BILLNO,
+            OH.RCPTNO,
+            OH.BILLDATE,
+            OH.PAYMODE,
+            S.ACCODE,
+            A.ACDESCR,
+            A.ACCREM,
+            OH.SCROLLNO,
+            OH.CHEQUEDDNO,
+            OH.CHEQUEDATE,
+            OH.REMARKS,
+            T.ACC_SHORT_NAME,
+            T.ACC_CLINIC_NAME,
+            T.ACC_CLINIC_NAME_CASH,
+            T.ACC2CARDREM,
+            T.ACC2UPIREM
+          HAVING ${amountExpression} <> 0
+        )
         SELECT
-          ISNULL(OH.BILLNO, '') INV_NO,
-          ISNULL(OH.RCPTNO, '') RCTNO,
-          CONVERT(varchar(20), OH.BILLDATE, 103) DATES,
-          S.ACCODE CODE,
-          A.ACDESCR NAME,
-          CASE 
-            WHEN OH.PAYMODE = '002' THEN 'CHQ'
-            WHEN OH.PAYMODE IN ('004', '005', '006') THEN 'CARD'
-            ELSE 'UPI'
-          END MODE_OF_PAYMENT,
-          '' CASH,
-          '' CARD,
-          '' BANK,
-          ROUND(COALESCE(SUM(OD.AMOUNT - (OD.SERDISCOUNT + OD.PATCNAMT)), 0), 0) Amount,
-          ISNULL(OH.SCROLLNO, '') SETTLEMENTNO,
-          ISNULL(T.ACC_SHORT_NAME, '') + ' ' +
+          INV_NO,
+          RCTNO,
+          DATES,
+          CODE,
+          NAME,
+          MODE_OF_PAYMENT,
+          CASH,
+          CARD,
+          BANK,
+          Amount,
+          SETTLEMENTNO,
+          ACCOUNT2,
+          CHEQUE_NO,
+          CHEQUE_DT,
+          NARRATION,
+          REMARKS,
+          COUNT(1) OVER() TotalRows,
+          SUM(Amount) OVER() GrandTotal
+        FROM BillRows
+        ORDER BY BillDateSort, MODE_OF_PAYMENT, NAME
+        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
+      `;
+      } else if (paymode === "001") {
+        sql = `
+        WITH Grouped AS (
+          SELECT
+            'MA1/' + CONVERT(varchar(4), YEAR(MIN(OH.BILLDATE)))
+              + '-' + RIGHT(CONVERT(varchar(4), YEAR(MIN(OH.BILLDATE)) + 1), 2)
+              + '/MCR-' + CAST(A.ACCODE AS varchar(20)) DocNo,
+            CONVERT(varchar(20), OH.BILLDATE, 103) Date,
+            'MAIN CASH - ' + ISNULL(T.ACC_CLINIC_NAME_CASH, '') CashBankAC,
+            'MA1' Division,
+            'MCR' Receipt_Type,
+            ISNULL(A.ACCREM, '') + ISNULL(T.ACC_CLINIC_NAME_CASH, '') 
+              + '(' + CONVERT(varchar(20), OH.BILLDATE, 103) + ')' sNarration,
+            A.ACCODE Account,
+            ${amountExpression} Amount,
+            MIN(CAST(OH.BILLDATE AS date)) BillDateSort
+          FROM OPD_BILLMST OH
+          LEFT JOIN OPD_BILLTRN OD ON OH.BILLNO = OD.BILLNO
+          LEFT JOIN MST_SERVICES S ON OD.SERVCODE = S.SERVCODE
+          LEFT JOIN MST_ACCOUNTS A ON A.ACCODE = S.ACCODE
+          OUTER APPLY (
+            SELECT TOP 1
+              ACC_CLINIC_NAME_CASH,
+              ACC_CLINIC_NAME,
+              ACC_SHORT_NAME,
+              ACC2CARDREM,
+              ACC2UPIREM,
+              CLINIC_CODE
+            FROM TM_CLINICS
+            WHERE CLNORGCODE = ISNULL(OD.CLNORGCODE, OH.CLNORGCODE)
+          ) T
+          WHERE
+            OH.PAYMODE = '001'
+            AND OH.BILLDATE >= @FromDate
+            AND OH.BILLDATE < DATEADD(day, 1, @ToDate)
+            ${clinicFilter}
+          GROUP BY
+            CONVERT(varchar(20), OH.BILLDATE, 103),
+            T.ACC_CLINIC_NAME_CASH,
+            A.ACCREM,
+            A.ACCODE
+          HAVING ${amountExpression} <> 0
+        )
+        SELECT
+          DocNo,
+          Date,
+          CashBankAC,
+          Division,
+          Receipt_Type,
+          sNarration,
+          Account,
+          Amount,
+          COUNT(1) OVER() TotalRows,
+          SUM(Amount) OVER() GrandTotal
+        FROM Grouped
+        ORDER BY CashBankAC, BillDateSort
+        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
+      `;
+      } else {
+        sql = `
+        WITH Grouped AS (
+          SELECT
+            ISNULL(OH.BILLNO, '') INV_NO,
+            ISNULL(OH.RCPTNO, '') RCTNO,
+            CONVERT(varchar(20), OH.BILLDATE, 103) DATES,
+            ISNULL(S.ACCODE, '') CODE,
+            ISNULL(A.ACDESCR, '') NAME,
             CASE 
               WHEN OH.PAYMODE = '002' THEN 'CHQ'
-              WHEN OH.PAYMODE IN ('004', '005', '006') THEN ISNULL(T.ACC2CARDREM, '')
-              ELSE ISNULL(T.ACC2UPIREM, '')
-            END + ISNULL(T.ACC_CLINIC_NAME, '') ACCOUNT2,
-          ISNULL(OH.CHEQUEDDNO, '') CHEQUE_NO,
-          CASE 
-            WHEN OH.CHEQUEDATE IS NULL OR CONVERT(date, OH.CHEQUEDATE) = '1900-01-01'
-            THEN ''
-            ELSE CONVERT(varchar(10), OH.CHEQUEDATE, 103)
-          END CHEQUE_DT,
-          ISNULL(A.ACCREM, '') + ISNULL(T.ACC_CLINIC_NAME, '') 
-            + '(' + CONVERT(varchar(20), OH.BILLDATE, 103) + ')' NARRATION,
-          ISNULL(OH.REMARKS, '') REMARKS,
-          MIN(CAST(OH.BILLDATE AS date)) BillDateSort
-        FROM OPD_BILLMST OH
-        LEFT JOIN OPD_BILLTRN OD ON OH.BILLNO = OD.BILLNO
-        LEFT JOIN MST_SERVICES S ON OD.SERVCODE = S.SERVCODE
-        LEFT JOIN MST_ACCOUNTS A ON A.ACCODE = S.ACCODE
-        OUTER APPLY (
-          SELECT TOP 1
-            ACC_CLINIC_NAME_CASH,
-            ACC_CLINIC_NAME,
-            ACC_SHORT_NAME,
-            ACC2CARDREM,
-            ACC2UPIREM,
-            CLINIC_CODE
-          FROM TM_CLINICS
-          WHERE CLNORGCODE = OD.CLNORGCODE
-        ) T
-        WHERE
-          OH.PAYMODE <> '001'
-          AND (@Paymode = '' OR OH.PAYMODE = @Paymode)
-          ${commonDateOrBillFilter}
-          ${clinicFilter}
-        GROUP BY
-          OH.BILLNO, OH.RCPTNO, CONVERT(varchar(20), OH.BILLDATE, 103),
-          S.ACCODE, A.ACDESCR, A.ACCREM, OH.PAYMODE,
-          OH.SCROLLNO, OH.CHEQUEDDNO, OH.CHEQUEDATE, OH.REMARKS,
-          T.ACC_SHORT_NAME, T.ACC_CLINIC_NAME, T.ACC2CARDREM, T.ACC2UPIREM
-        HAVING ROUND(COALESCE(SUM(OD.AMOUNT - (OD.SERDISCOUNT + OD.PATCNAMT)), 0), 0) <> 0
-      )
-      SELECT
-        INV_NO, RCTNO, DATES, CODE, NAME, MODE_OF_PAYMENT, CASH, CARD, BANK,
-        Amount, SETTLEMENTNO, ACCOUNT2, CHEQUE_NO, CHEQUE_DT, NARRATION, REMARKS,
-        COUNT(1) OVER() TotalRows,
-        SUM(Amount) OVER() GrandTotal
-      FROM Grouped
-      ORDER BY BillDateSort, NAME
-      OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
-    `;
-  }
+              WHEN OH.PAYMODE IN ('004', '005', '006') THEN 'CARD'
+              ELSE 'UPI'
+            END MODE_OF_PAYMENT,
+            '' CASH,
+            '' CARD,
+            '' BANK,
+            ${amountExpression} Amount,
+            ISNULL(OH.SCROLLNO, '') SETTLEMENTNO,
+            ISNULL(T.ACC_SHORT_NAME, '') + ' ' +
+              CASE 
+                WHEN OH.PAYMODE = '002' THEN 'CHQ'
+                WHEN OH.PAYMODE IN ('004', '005', '006') THEN ISNULL(T.ACC2CARDREM, '')
+                ELSE ISNULL(T.ACC2UPIREM, '')
+              END + ISNULL(T.ACC_CLINIC_NAME, '') ACCOUNT2,
+            ISNULL(OH.CHEQUEDDNO, '') CHEQUE_NO,
+            CASE 
+              WHEN OH.CHEQUEDATE IS NULL OR CONVERT(date, OH.CHEQUEDATE) = '1900-01-01'
+              THEN ''
+              ELSE CONVERT(varchar(10), OH.CHEQUEDATE, 103)
+            END CHEQUE_DT,
+            ISNULL(A.ACCREM, '') + ISNULL(T.ACC_CLINIC_NAME, '') 
+              + '(' + CONVERT(varchar(20), OH.BILLDATE, 103) + ')' NARRATION,
+            ISNULL(OH.REMARKS, '') REMARKS,
+            MIN(CAST(OH.BILLDATE AS date)) BillDateSort
+          FROM OPD_BILLMST OH
+          LEFT JOIN OPD_BILLTRN OD ON OH.BILLNO = OD.BILLNO
+          LEFT JOIN MST_SERVICES S ON OD.SERVCODE = S.SERVCODE
+          LEFT JOIN MST_ACCOUNTS A ON A.ACCODE = S.ACCODE
+          OUTER APPLY (
+            SELECT TOP 1
+              ACC_CLINIC_NAME_CASH,
+              ACC_CLINIC_NAME,
+              ACC_SHORT_NAME,
+              ACC2CARDREM,
+              ACC2UPIREM,
+              CLINIC_CODE
+            FROM TM_CLINICS
+            WHERE CLNORGCODE = ISNULL(OD.CLNORGCODE, OH.CLNORGCODE)
+          ) T
+          WHERE
+            OH.PAYMODE <> '001'
+            AND (@Paymode = '' OR OH.PAYMODE = @Paymode)
+            AND OH.BILLDATE >= @FromDate
+            AND OH.BILLDATE < DATEADD(day, 1, @ToDate)
+            ${clinicFilter}
+          GROUP BY
+            OH.BILLNO,
+            OH.RCPTNO,
+            CONVERT(varchar(20), OH.BILLDATE, 103),
+            S.ACCODE,
+            A.ACDESCR,
+            A.ACCREM,
+            OH.PAYMODE,
+            OH.SCROLLNO,
+            OH.CHEQUEDDNO,
+            OH.CHEQUEDATE,
+            OH.REMARKS,
+            T.ACC_SHORT_NAME,
+            T.ACC_CLINIC_NAME,
+            T.ACC2CARDREM,
+            T.ACC2UPIREM
+          HAVING ${amountExpression} <> 0
+        )
+        SELECT
+          INV_NO,
+          RCTNO,
+          DATES,
+          CODE,
+          NAME,
+          MODE_OF_PAYMENT,
+          CASH,
+          CARD,
+          BANK,
+          Amount,
+          SETTLEMENTNO,
+          ACCOUNT2,
+          CHEQUE_NO,
+          CHEQUE_DT,
+          NARRATION,
+          REMARKS,
+          COUNT(1) OVER() TotalRows,
+          SUM(Amount) OVER() GrandTotal
+        FROM Grouped
+        ORDER BY BillDateSort, NAME
+        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
+      `;
+      }
 
-  try {
-    if (!hasBillNo && (!fromDate || !toDate)) {
-      res.status(400).json({
-        status: 1,
-        result: "Please select From Date and To Date or enter Bill No",
+      const { records } = await executeDbQuery(sql, {
+        FromDate: fromDate,
+        ToDate: toDate,
+        Bill_number: `%${billNo}%`,
+        Clinic_Code: `%${clinicCode}%`,
+        Paymode: paymode === "001" ? "" : paymode,
+        Offset: offset,
+        PageSize: pageSize,
       });
-      return;
+
+      const cleanRecords = (records || []).map((row: any) => {
+        const cleaned: any = {};
+        for (const key in row) cleaned[key] = row[key] == null ? "" : row[key];
+        return cleaned;
+      });
+
+      res.json({
+        status: 0,
+        result: cleanRecords,
+        totalRows: cleanRecords[0]?.TotalRows ?? 0,
+        grandTotal: cleanRecords[0]?.GrandTotal ?? 0,
+        pageNo,
+        pageSize,
+      });
+    } catch (err: any) {
+      console.error("AccountReport error:", err);
+      res.status(500).json({
+        status: 1,
+        result: err.message || "Error loading account report",
+      });
     }
-
-    const { records } = await executeDbQuery(sql, {
-      FromDate: fromDate,
-      ToDate: toDate,
-      Bill_number: `%${billNo}%`,
-      Clinic_Code: `%${clinicCode}%`,
-      Paymode: paymode === "001" ? "" : paymode,
-      Offset: offset,
-      PageSize: pageSize,
-    });
-
-    const cleanRecords = (records || []).map((row: any) => {
-      const cleaned: any = {};
-      for (const key in row) cleaned[key] = row[key] == null ? "" : row[key];
-      return cleaned;
-    });
-
-    res.json({
-      status: 0,
-      result: cleanRecords,
-      totalRows: cleanRecords[0]?.TotalRows ?? 0,
-      grandTotal: cleanRecords[0]?.GrandTotal ?? 0,
-      pageNo,
-      pageSize,
-    });
-  } catch (err: any) {
-    console.error("AccountReport error:", err);
-    res.status(500).json({ status: 1, result: err.message });
   }
-}
 
   async AmbulanceDetails(req: Request, res: Response): Promise<void> {
     const input = req.method === "GET" ? req.query : req.body;
