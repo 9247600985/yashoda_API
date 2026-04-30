@@ -28,17 +28,22 @@ export default class consultationController {
 
   constructor(private app: Router) {
     app.use("/op", authenticateToken, this.router);
-this.router.get(
-  "/getHospDataByCounter",
-  authenticateToken,
-  this.getHospDataByCounter.bind(this),
-);
+    this.router.get(
+      "/getHospDataByCounter",
+      authenticateToken,
+      this.getHospDataByCounter.bind(this),
+    );
+    this.router.get(
+      "/getUserType",
+      authenticateToken,
+      this.getUserType.bind(this),
+    );
 
-this.router.get(
-  "/getHospData",
-  authenticateToken,
-  this.getHospData.bind(this),
-);
+    this.router.get(
+      "/getHospData",
+      authenticateToken,
+      this.getHospData.bind(this),
+    );
     this.router.get(
       "/Duplicate",
       authenticateToken,
@@ -385,30 +390,29 @@ this.router.get(
       authenticateToken,
       this.loadDepartment.bind(this),
     );
-     this.router.get(
+    this.router.get(
       "/loadDoctorsForConsultation",
       authenticateToken,
       this.loadDoctorsForConsultation.bind(this),
     );
-    
   }
   async getHospDataByCounter(req: Request, res: Response): Promise<void> {
-  try {
-    const input = req.method === "GET" ? req.query : req.body;
+    try {
+      const input = req.method === "GET" ? req.query : req.body;
 
-    let counterId = String(input.counterId || "").trim();
-    const hospitalId = String(input.HospitalId || "").trim();
+      let counterId = String(input.counterId || "").trim();
+      const hospitalId = String(input.HospitalId || "").trim();
 
-    if (!counterId) {
-      counterId = "OP1";
-    }
+      if (!counterId) {
+        counterId = "OP1";
+      }
 
-    if (!hospitalId) {
-      res.status(400).json({ status: 1, result: "HospitalId is required" });
-      return;
-    }
+      if (!hospitalId) {
+        res.status(400).json({ status: 1, result: "HospitalId is required" });
+        return;
+      }
 
-    const query = `
+      const query = `
       SELECT
         HEADERNAME,
         NANONAME,
@@ -421,65 +425,65 @@ this.router.get(
         AND Status = 'A'
     `;
 
-    const params = {
-      counterId,
-      hospitalId,
-    };
+      const params = {
+        counterId,
+        hospitalId,
+      };
 
-    const { records } = await executeDbQuery(query, params);
+      const { records } = await executeDbQuery(query, params);
 
-    const result = (records || []).map((row: any) => ({
-      HospitalName: row.HEADERNAME || "",
-      Phone_No: row.MOBILE || "",
-      EMail: row.EMAIL || "",
-      NanoName: row.NANONAME || "",
-      address1: row.ADDRESS || "",
-    }));
+      const result = (records || []).map((row: any) => ({
+        HospitalName: row.HEADERNAME || "",
+        Phone_No: row.MOBILE || "",
+        EMail: row.EMAIL || "",
+        NanoName: row.NANONAME || "",
+        address1: row.ADDRESS || "",
+      }));
 
-    res.json({ status: 0, result });
-  } catch (err: any) {
-    res.status(500).json({ status: 1, result: err.message });
-  }
-}
-
-async getHospData(req: Request, res: Response): Promise<void> {
-  try {
-    const input = req.method === "GET" ? req.query : req.body;
-    const hospitalId = String(input.HospitalId || "").trim();
-
-    if (!hospitalId) {
-      res.status(400).json({ status: 1, result: "HospitalId is required" });
-      return;
+      res.json({ status: 0, result });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
     }
-
-    const query = `EXEC sp_getHospitalId @hospitalId`;
-
-    const params = {
-      hospitalId,
-    };
-
-    const { records } = await executeDbQuery(query, params);
-
-    const result = (records || []).map((row: any) => ({
-      Hospital_Id: row.Hospital_Id || "",
-      HospitalName: row.HospitalName || "",
-      address1: row.address1 || "",
-      address2: row.address2 || "",
-      address3: row.address3 || "",
-      Phone_No: row.Phone_No || "",
-      EMail: row.EMail || "",
-      Website: row.Website || "",
-      Photo: row.photo || "",
-      NanoName: row.NanoName || "",
-      GstNo: row.GSTNO || "",
-      DlNo: row.DLNO || "",
-    }));
-
-    res.json({ status: 0, result });
-  } catch (err: any) {
-    res.status(500).json({ status: 1, result: err.message });
   }
-}
+
+  async getHospData(req: Request, res: Response): Promise<void> {
+    try {
+      const input = req.method === "GET" ? req.query : req.body;
+      const hospitalId = String(input.HospitalId || "").trim();
+
+      if (!hospitalId) {
+        res.status(400).json({ status: 1, result: "HospitalId is required" });
+        return;
+      }
+
+      const query = `EXEC sp_getHospitalId @hospitalId`;
+
+      const params = {
+        hospitalId,
+      };
+
+      const { records } = await executeDbQuery(query, params);
+
+      const result = (records || []).map((row: any) => ({
+        Hospital_Id: row.Hospital_Id || "",
+        HospitalName: row.HospitalName || "",
+        address1: row.address1 || "",
+        address2: row.address2 || "",
+        address3: row.address3 || "",
+        Phone_No: row.Phone_No || "",
+        EMail: row.EMail || "",
+        Website: row.Website || "",
+        Photo: row.photo || "",
+        NanoName: row.NanoName || "",
+        GstNo: row.GSTNO || "",
+        DlNo: row.DLNO || "",
+      }));
+
+      res.json({ status: 0, result });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
   async getCounters(req: Request, res: Response): Promise<void> {
     const sql = `select CashCounter_Code,CashCounter_Desc,Status from Mst_CashCounter WHERE Status='A' order by CashCounter_Code`;
     try {
@@ -572,8 +576,8 @@ async getHospData(req: Request, res: Response): Promise<void> {
   //   }
   // }
   async loadDoctorsByRefHospital(req: Request, res: Response): Promise<void> {
-  try {
-    const query = `
+    try {
+      const query = `
       SELECT Code, Firstname
       FROM Mst_DoctorMaster
       WHERE status = 'A'
@@ -581,26 +585,26 @@ async getHospData(req: Request, res: Response): Promise<void> {
       ORDER BY Firstname
     `;
 
-    const params = {
-      RefHospTypeId: req.query.RefHospTypeId,
-    };
+      const params = {
+        RefHospTypeId: req.query.RefHospTypeId,
+      };
 
-    const result = await executeDbQuery(query, params);
+      const result = await executeDbQuery(query, params);
 
-    res.json({
-      status: 0,
-      result: result.records || [],
-    });
-  } catch (err: any) {
-    res.status(500).json({
-      status: 1,
-      message: err.message,
-    });
+      res.json({
+        status: 0,
+        result: result.records || [],
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: 1,
+        message: err.message,
+      });
+    }
   }
-}
-async loadDoctorsForConsultation(req: Request, res: Response): Promise<void> {
-  try {
-    const query = `
+  async loadDoctorsForConsultation(req: Request, res: Response): Promise<void> {
+    try {
+      const query = `
       SELECT 
           M.Code,
           M.Firstname
@@ -614,23 +618,23 @@ async loadDoctorsForConsultation(req: Request, res: Response): Promise<void> {
       ORDER BY M.Firstname
     `;
 
-    const params = {
-      HospitalId: req.query.HospitalId,
-    };
+      const params = {
+        HospitalId: req.query.HospitalId,
+      };
 
-    const result = await executeDbQuery(query, params);
+      const result = await executeDbQuery(query, params);
 
-    res.json({
-      status: 0,
-      result: result.records || [],
-    });
-  } catch (err: any) {
-    res.status(500).json({
-      status: 1,
-      message: err.message,
-    });
+      res.json({
+        status: 0,
+        result: result.records || [],
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: 1,
+        message: err.message,
+      });
+    }
   }
-}
   async loadDepartment(req: Request, res: Response): Promise<void> {
     const sql = `select DEPTCODE,DEPTNAME,Status from Mst_Department WHERE Status='A' order by DEPTNAME`;
     try {
@@ -3764,12 +3768,12 @@ async loadDoctorsForConsultation(req: Request, res: Response): Promise<void> {
     }
   }
 
- async viewVisits(req: Request, res: Response): Promise<void> {
-  const input = req.method === 'GET' ? req.query : req.body;
-  const MEDRECNO = input.MEDRECNO;
+  async viewVisits(req: Request, res: Response): Promise<void> {
+    const input = req.method === "GET" ? req.query : req.body;
+    const MEDRECNO = input.MEDRECNO;
 
-  try {
-    const query = `
+    try {
+      const query = `
       SELECT 
         C.MEDRECNO,
         PM.FirstName AS PATNAME,
@@ -3794,17 +3798,43 @@ async loadDoctorsForConsultation(req: Request, res: Response): Promise<void> {
       ORDER BY C.RECEIPTDATE
     `;
 
-    const result = await executeDbQuery(query, { MEDRECNO });
+      const result = await executeDbQuery(query, { MEDRECNO });
 
-    res.json({
-      status: 0,
-      result: result.records || [],
-    });
-  } catch (err: any) {
-    res.status(500).json({
-      status: 1,
-      message: err.message,
-    });
+      res.json({
+        status: 0,
+        result: result.records || [],
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: 1,
+        message: err.message,
+      });
+    }
   }
- }
+
+  async getUserType(req: Request, res: Response): Promise<void> {
+    try {
+      const USERID = String(req.query.USERID || "").trim();
+
+      if (!USERID) {
+        res.status(400).json({ status: 1, message: "USERID is required" });
+        return;
+      }
+
+      const query = `
+      SELECT 
+        USERID,
+        USERNAME AS UserType
+      FROM MST_USERDETAILS
+      WHERE USERID = @USERID
+        AND STATUS = 'A'
+    `;
+
+      const { records } = await executeDbQuery(query, { USERID }); // 🔑 key must match @USERID
+
+      res.json({ status: 0, result: records || [] });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
 }
