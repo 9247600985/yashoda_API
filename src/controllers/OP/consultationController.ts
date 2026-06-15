@@ -355,6 +355,11 @@ export default class consultationController {
       authenticateToken,
       this.loadnationality.bind(this),
     );
+     this.router.get(
+      "/loadreligions",
+      authenticateToken,
+      this.loadreligions.bind(this),
+    );
     this.router.get(
       "/loadRefAgents",
       authenticateToken,
@@ -653,6 +658,16 @@ export default class consultationController {
       res.status(500).json({ status: 1, result: err.message });
     }
   }
+async loadreligions(req: Request, res: Response): Promise<void> {
+    const sql = `select RLGN_Code,RLGN_Desc,Status from MST_RELIGIONS WHERE Status='A' order by RLGN_Desc`;
+    try {
+      const { records } = await executeDbQuery(sql);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, result: err.message });
+    }
+  }
+  
   async loadRefAgents(req: Request, res: Response): Promise<void> {
     const sql = `select Ref_ID,Ref_FName,Status from Mst_ReferralAgents WHERE Status='A' order by Ref_FName`;
     try {
@@ -2592,14 +2607,14 @@ export default class consultationController {
       const params = {
         OPDNum: input.OPDNum || null,
         PatientMr_No: input.mrno,
-        Patient_Name: input.patname,
+        Patient_Name: input.patname||input.Patient_Name,
         Age: input.age,
         Occupation: input.Occupation || null,
         Blood_Group: input.bloodgroup,
         Telephone: input.mobile,
         Mobile: input.mobile,
         Email: input.email,
-        Patient_DOB: input.dob,
+        Patient_DOB: input.dob || input.Patient_DOB,
         Gender: input.gender,
         weight: input.weight || 0,
         Height: input.hieght || 0,
