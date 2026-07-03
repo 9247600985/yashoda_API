@@ -14,6 +14,8 @@ export default class grnController {
     this.router.get("/getGrnList", authenticateToken, this.getGrnList.bind(this));
     this.router.post("/insertGrn", authenticateToken, this.insertGrn.bind(this));
     this.router.post("/updateGrn", authenticateToken, this.updateGrn.bind(this));
+    this.router.get("/getHospitalStateCode", authenticateToken, this.getHospitalStateCode.bind(this));
+    this.router.get("/getStoresByHospital", authenticateToken, this.getStoresByHospital.bind(this));
   }
 
   // ── SEARCH ITEMS DYNAMICALLY (TOP 50) ───────────────────────────────────
@@ -35,7 +37,7 @@ export default class grnController {
         Item_ID, ItemCode, ItemName, Item_Desc, GrpMst_ID,
         SubGrpMst_ID, im.Category_ID, cm.Category_Name, im.GenericId, 
         ISNULL(gm.GENERICNAME,'') AS GENERICNAME, MaterialType,
-        ItemsClassification, Store_ID, UOM_Recieve, UOM_Storage, UOM_Dispense, 
+        ItemsClassification, Store_ID, im.UOM_Recieve, ISNULL(uom.UOM_NAME, im.UOM_Recieve) AS UOM_Recieve_Name, UOM_Storage, UOM_Dispense, 
         Is_BatchYN, VEDClassification, Is_IssueAllowed, VAT, CST, im.CREATED_BY, 
         im.CREATED_ON, im.EDITED_BY, im.EDITED_ON, im.STATUS, Manufact_ID, 
         Material_Cost, Mtrl_MRP, im.CLNORGCODE, Is_DecimalQtyAllowed, 
@@ -44,6 +46,7 @@ export default class grnController {
       FROM INV_ITEMMAST im
       LEFT JOIN Category_Master cm ON cm.Category_ID = im.Category_ID
       LEFT JOIN INV_GENERICS gm ON gm.GENERICID = im.GenericId
+      LEFT JOIN MST_UnitOfMeasurement uom ON uom.UOM_ID = im.UOM_Recieve
       ${whereClause}
       ORDER BY im.ItemName
     `;
@@ -55,6 +58,39 @@ export default class grnController {
       res.json({ status: 0, records });
     } catch (err: any) {
       console.error('searchItems Error:', err);
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  // ── GET HOSPITAL STATE CODE ───────────────────────────────────────────────
+  async getHospitalStateCode(req: Request, res: Response): Promise<void> {
+    const hospitalId = req.query.hospitalId as string;
+    try {
+      if (!hospitalId) {
+        res.status(400).json({ status: 1, message: 'hospitalId required' });
+        return;
+      }
+      const sqlStr = `SELECT LEFT(gstno, 2) AS StateCode FROM hospitalslist WHERE hospital_id = @hospitalId`;
+      const { records } = await executeDbQuery(sqlStr, { hospitalId });
+      res.json({ status: 0, StateCode: records.length ? (records[0].StateCode || '') : '' });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
+    }
+  }
+
+  // ── GET STORES BY HOSPITAL ──────────────────────────────────────────────
+  async getStoresByHospital(req: Request, res: Response): Promise<void> {
+    const hospitalId = req.query.hospitalId as string;
+    try {
+      if (!hospitalId) {
+        res.status(400).json({ status: 1, message: 'hospitalId required' });
+        return;
+      }
+      const sqlStr = `SELECT Store_Code, Store_Name FROM INV_STOREMST WHERE CLNORGCODE = @hospitalId AND STATUS = 'A' ORDER BY Store_Name`;
+      const { records } = await executeDbQuery(sqlStr, { hospitalId });
+      const mapped = records.map(r => ({ CODE: r.Store_Code, NAME: r.Store_Name }));
+      res.json({ status: 0, d: mapped });
+    } catch (err: any) {
       res.status(500).json({ status: 1, message: err.message });
     }
   }
