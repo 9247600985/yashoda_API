@@ -25,6 +25,7 @@ import doctorChargeMasterController from "./controllers/Masters/doctorChargeMast
 import SubModuleController from "./controllers/Security/SubModuleController";
 import HospitalsController from "./controllers/Security/HospitalsController ";
 import vendorController from "./controllers/Pharmacy/vendor";
+import grnController from "./controllers/Pharmacy/grn";
 
 const app: Application = express();
 const apiRouter: Router = Router();
@@ -78,6 +79,7 @@ new doctorChargeMasterController(apiRouter);
 new SubModuleController(apiRouter);
 new HospitalsController (apiRouter);
 new vendorController (apiRouter);
+new grnController(apiRouter);
 
 
 app.use("/api", apiRouter);
