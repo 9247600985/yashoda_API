@@ -24,6 +24,7 @@ import serviceController from "./controllers/Masters/serviceController";
 import doctorChargeMasterController from "./controllers/Masters/doctorChargeMasterController";
 import SubModuleController from "./controllers/Security/SubModuleController";
 import HospitalsController from "./controllers/Security/HospitalsController ";
+import vendorController from "./controllers/Pharmacy/vendor";
 
 const app: Application = express();
 const apiRouter: Router = Router();
@@ -76,6 +77,7 @@ new serviceController(apiRouter);
 new doctorChargeMasterController(apiRouter);
 new SubModuleController(apiRouter);
 new HospitalsController (apiRouter);
+new vendorController (apiRouter);
 
 
 app.use("/api", apiRouter);
