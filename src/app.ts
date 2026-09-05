@@ -27,6 +27,7 @@ import HospitalsController from "./controllers/Security/HospitalsController ";
 import vendorController from "./controllers/Pharmacy/vendor";
 import grnController from "./controllers/Pharmacy/grn";
 import stockEntryController from "./controllers/Pharmacy/stockEntry";
+import cashSaleController from "./controllers/Pharmacy/cashSale";
 
 const app: Application = express();
 const apiRouter: Router = Router();
@@ -82,6 +83,7 @@ new HospitalsController (apiRouter);
 new vendorController (apiRouter);
 new grnController(apiRouter);
 new stockEntryController(apiRouter);
+new cashSaleController(apiRouter);
 
 
 app.use("/api", apiRouter);
