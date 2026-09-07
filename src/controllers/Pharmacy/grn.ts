@@ -2,6 +2,7 @@ import express, { Request, Response, Router } from "express";
 import sql from 'mssql';
 import { conpool, executeDbQuery } from "../../db";
 import { authenticateToken } from "../../utilities/authMiddleWare";
+import { log } from "winston";
 
 export default class grnController {
   private router: Router = express.Router();
@@ -137,7 +138,8 @@ export default class grnController {
   // ── INSERT GRN (TRANSACTION SAFE) ───────────────────────────────────────
   async insertGrn(req: Request, res: Response): Promise<void> {
     const data = req.body;
-    const store = data.store || '001001001000';
+    const store = data.store || '01';
+    const CLNORGCODE='001001001000';
     const storeCode = store.substring(0, 6);
     const userId = (req as any).user?.userId || '6453'; // Use token user or fallback
 
@@ -148,37 +150,53 @@ export default class grnController {
       // 1. Get active financial year
       const yearRes = await executeDbQuery(
         `SELECT top 1 FinYear FROM Mst_AccYear WHERE UPPER(OpenStatus)='O' AND UPPER(CurrentFinancialYear)='Y' AND CLNORGCODE = @CLNORGCODE`,
-        { CLNORGCODE: store },
+        { CLNORGCODE: CLNORGCODE },
         { transaction }
       );
       const finYear = yearRes.records?.[0]?.FinYear;
       if (!finYear) throw new Error('Active financial year not found');
 
       // 2. Increment and get doc no reference
-      const docNoRes = await executeDbQuery(
-        `UPDATE MST_DOCNOREF 
-         SET CURRENTNO = COALESCE(CURRENTNO, 0) + 1 
-         OUTPUT INSERTED.PREFIX, INSERTED.CURRENTNO
-         WHERE STATUS = 'A' AND DOCREFNAME = 'INV_GRNMST' AND FINYEAR = @FINYEAR AND CLNORGCODE = @CLNORGCODE`,
-        { FINYEAR: finYear, CLNORGCODE: store },
-        { transaction }
-      );
-      const docNoRef = docNoRes.records?.[0];
-      if (!docNoRef) throw new Error('Document number reference not found for INV_GRNMST');
+      // const docNoRes = await executeDbQuery(
+      //   `UPDATE MST_DOCNOREF 
+      //    SET CURRENTNO = COALESCE(CURRENTNO, 0) + 1 
+      //    OUTPUT INSERTED.PREFIX, INSERTED.CURRENTNO
+      //    WHERE STATUS = 'A' AND DOCREFNAME = 'INV_GRNMST' AND FINYEAR = @FINYEAR AND CLNORGCODE = @CLNORGCODE`,
+      //   { FINYEAR: finYear, CLNORGCODE: CLNORGCODE },
+      //   { transaction }
+      // );
+      // const docNoRef = docNoRes.records?.[0];
+      // if (!docNoRef) throw new Error('Document number reference not found for INV_GRNMST');
 
-      const prefix = docNoRef.PREFIX || 'INV_GRN';
-      const currentNo = docNoRef.CURRENTNO;
+      // const prefix = docNoRef.PREFIX || 'INV_GRN';
+      // const currentNo = docNoRef.CURRENTNO;
 
       // 3. Get hospital shortname
       const hospRes = await executeDbQuery(
         `SELECT SHORTNAME FROM HOSPITALSLIST WHERE Hospital_Id = @CLNORGCODE`,
-        { CLNORGCODE: store },
+        { CLNORGCODE: CLNORGCODE },
         { transaction }
       );
       const shortName = hospRes.records?.[0]?.SHORTNAME || '';
 
+      let grncurno :any =await executeDbQuery(
+        `       select GRNCASH CURRENTNO FROM INV_STOREDOC 
+WHERE STATUS='A'  and FINYEAR=@FINYEAR 
+and CLNORGCODE=@CLNORGCODE
+AND STORELOCK ='N' AND YEARCLOSE='N'
+AND STORECODE = @STORECODE `,
+{ CLNORGCODE: CLNORGCODE, FINYEAR:finYear,STORECODE:storeCode},
+        { transaction }
+      )
+      const finsubyr=finYear.substring(2,4);
+
       // 4. Construct GRNNO
-      const grnNo = `${prefix}${shortName}${String(currentNo).padStart(6, '0')}`;
+     // const grnNo = `${prefix}${shortName}${String(currentNo).padStart(6, '0')}`;
+
+const currentNo = grncurno.records?.[0].CURRENTNO ?? 0;
+      const grnNo = `${shortName}-GR-${storeCode}-${finsubyr}-${String(currentNo).padStart(6, '0')}`;
+      console.log(currentNo);
+console.log(grnNo);
 
       // 5. Insert GRN Header (INV_GRNMST)
       const mstSql = `
@@ -214,7 +232,7 @@ export default class grnController {
       `;
 
       await executeDbQuery(mstSql, {
-        CLNORGCODE: store,
+        CLNORGCODE: CLNORGCODE,
         FINYEAR: finYear,
         STORECODE: storeCode,
         VENDCODE: data.vendorId,
@@ -285,7 +303,7 @@ export default class grnController {
           `;
 
           await executeDbQuery(trnSql, {
-            CLNORGCODE: store,
+            CLNORGCODE: CLNORGCODE,
             FINYEAR: finYear,
             GRNNO: grnNo,
             SEQNO: seqNo,
@@ -319,6 +337,16 @@ export default class grnController {
           }, { transaction });
         }
       }
+
+      const updateGRNNO= await executeDbQuery(
+        `update INV_STOREDOC set GRNCASH=GRNCASH+1
+where  STATUS='A' and FINYEAR =@FINYEAR 
+and CLNORGCODE=@CLNORGCODE
+AND STORELOCK ='N' AND YEARCLOSE='N'
+AND STORECODE = @STORECODE`,
+{CLNORGCODE:CLNORGCODE,FINYEAR:finYear,STORECODE:storeCode},
+{transaction}
+      )
 
       await transaction.commit();
       res.json({ status: 0, d: { grnNo } });
