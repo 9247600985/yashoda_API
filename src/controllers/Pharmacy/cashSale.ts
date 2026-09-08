@@ -515,6 +515,60 @@ export default class cashSaleController {
             BATCHNO: batchNo
           }, { transaction });
         }
+
+        // Insert Stock Ledger (INV_STOCKLGR)
+        const stockLgrSql = `
+          INSERT INTO [dbo].[INV_STOCKLGR] (
+            [CLNORGCODE], [FINYEAR], [TRANTYPE],
+            [TRANNO], [TRANDATE], [STORECODE],
+            [DEPTCODE], [MEDRECNO], [IPNO],
+            [EMPCODE], [VENDCODE], [MTRLCODE],
+            [BATCHNO], [EXPIRYDATE], [TRANQTY],
+            [TRANRATE], [TRANAMOUNT], [REMARKS],
+            [COSTPRICE], [LANDEDCOST], [MRP],
+            [WTAVGRATE], [CREATED_BY], [CREATED_ON],
+            [EDITED_BY], [EDITED_ON], [STATUS],
+            [SALEPRICE], [CGST], [SGST], [IGST], [HSN]
+          ) VALUES (
+            '001001001000', '2025-2026', 'CS',
+            @TRANNO, GETDATE(), @STORECODE,
+            @DEPTCODE, @MEDRECNO, @IPNO,
+            @EMPCODE, @VENDCODE, @MTRLCODE,
+            @BATCHNO, '2028-12-31', @TRANQTY,
+            @TRANRATE, @TRANAMOUNT, @REMARKS,
+            @COSTPRICE, @LANDEDCOST, @MRP,
+            @WTAVGRATE, @CREATED_BY, GETDATE(),
+            @EDITED_BY, GETDATE(), 'A',
+            @SALEPRICE, @CGST, @SGST, @IGST, @HSN
+          )
+        `;
+
+        await executeDbQuery(stockLgrSql, {
+          TRANNO: generatedBillNo,
+          STORECODE: storeCode,
+          DEPTCODE: payload.deptCode || '',
+          MEDRECNO: payload.mrNumber || '',
+          IPNO: payload.ipNo || '',
+          EMPCODE: payload.empCode || '',
+          VENDCODE: item.vendCode || '',
+          MTRLCODE: mtrlCode,
+          BATCHNO: batchNo,
+          TRANQTY: qty,
+          TRANRATE: mrp,
+          TRANAMOUNT: lineTotal,
+          REMARKS: payload.remarks || '',
+          COSTPRICE: item.costPrice || mrp,
+          LANDEDCOST: item.landedCost || mrp,
+          MRP: mrp,
+          WTAVGRATE: item.wtAvgRate || mrp,
+          CREATED_BY: userId,
+          EDITED_BY: userId,
+          SALEPRICE: mrp,
+          CGST: item.cgst || 0,
+          SGST: item.sgst || 0,
+          IGST: item.igst || 0,
+          HSN: item.hsn || ''
+        }, { transaction });
       }
 
       // 3. Insert Receipt Header (INV_RECEIPTS)
