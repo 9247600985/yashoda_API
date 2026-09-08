@@ -138,7 +138,7 @@ export default class cashSaleController {
   }
 
   /**
-   * Search OP / Direct Patients
+   * Search OP / Direct Patients from PATIENT_MASTER
    */
   async getOpPatients(req: Request, res: Response): Promise<void> {
     const searchBy = (req.query.searchBy as string || 'MRNUMBER').toUpperCase();
@@ -149,36 +149,37 @@ export default class cashSaleController {
       return;
     }
 
-    let whereField = "p.MRNO";
+    let pmWhereField = "ISNULL(p.PATIENTMR_NO, p.PatientMr_No)";
+
     if (searchBy === 'MOBILENO') {
-      whereField = "p.MOBILE";
+      pmWhereField = "p.Mobile";
     } else if (searchBy === 'NAME') {
-      whereField = "p.PATIENTNAME";
+      pmWhereField = "ISNULL(p.PATIENT_NAME, ISNULL(p.Patient_Name, ISNULL(p.FirstName, '')))";
     }
 
-    const sqlQuery = `
+    const patientMasterQuery = `
       SELECT TOP 20
-        p.MRNO AS MR_NUMBER,
-        p.OPNO AS OP_NUMBER,
-        p.PATIENTNAME AS PATIENT_NAME,
-        p.SALUTATION,
-        p.GENDER,
-        p.AGE,
-        p.MOBILE AS MOBILE_NO,
-        p.PATCATEGORY AS PAT_CATEGORY,
-        p.REFDOCTOR AS REF_DOCTOR
-      FROM OPD_PATMTR p
-      WHERE ${whereField} LIKE @searchVal
-      ORDER BY p.CREATEDON DESC
+        ISNULL(p.PATIENTMR_NO, ISNULL(p.PatientMr_No, '')) AS MR_NUMBER,
+        ISNULL(NULLIF(p.PATIENT_NAME, ''), ISNULL(NULLIF(p.Patient_Name, ''), ISNULL(NULLIF(LTRIM(RTRIM(ISNULL(p.FirstName, '') + ' ' + ISNULL(p.LastName, ''))), ''), 'Walk-in Patient'))) AS PATIENT_NAME,
+        ISNULL(s.Sal_Desc, ISNULL(p.Salutation, '')) AS SALUTATION,
+        ISNULL(p.Gender, '') AS GENDER,
+        ISNULL(CONVERT(VARCHAR(20), p.Age), '') AS AGE,
+        ISNULL(p.Mobile, '') AS MOBILE_NO,
+        ISNULL(r.RefDoctor_FName, ISNULL(p.ReferralDoctor_ID, '')) AS REF_DOCTOR
+      FROM PATIENT_MASTER p
+      LEFT JOIN Mst_Salutation s ON CAST(s.Sal_Code AS VARCHAR) = CAST(p.Salutation AS VARCHAR)
+      LEFT JOIN Mst_ReferralDoctor r ON CAST(r.RefDoct_ID AS VARCHAR) = CAST(p.ReferralDoctor_ID AS VARCHAR)
+      WHERE ${pmWhereField} LIKE @searchVal
+      ORDER BY 1 DESC
     `;
 
     try {
-      const { records } = await executeDbQuery(sqlQuery, {
+      const { records } = await executeDbQuery(patientMasterQuery, {
         searchVal: `%${searchValue}%`
       });
-      res.json({ status: 0, d: records });
+      res.json({ status: 0, d: records || [] });
     } catch (err: any) {
-      console.error('getOpPatients Error:', err);
+      console.error('getOpPatients PATIENT_MASTER Error:', err);
       res.json({ status: 0, d: [] });
     }
   }
