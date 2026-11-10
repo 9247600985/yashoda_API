@@ -16,9 +16,38 @@ export default class sampleCollectionController {
         this.router.get("/DispalyData", authenticateToken, this.getDetails.bind(this));
         this.router.put("/updateDataList", authenticateToken, this.changeStatus.bind(this));
         this.router.put("/clickUpdate", authenticateToken, this.updateDGLORDERTRN.bind(this));
+          this.router.get("/getLabDepartments",authenticateToken,this.getLabDepartments.bind(this),
+    );
 
     }
+ async getLabDepartments(req: Request, res: Response): Promise<void> {
+    try {
+      const sql = `
+      SELECT
+        LABDPTCODE,
+        LABDPTDESC
+      FROM DGL_LABDEPT
+      WHERE STATUS = 'A'
+      ORDER BY LABDPTDESC
+    `;
 
+      const { records } = await executeDbQuery(sql, {});
+
+      res.json({
+        status: 0,
+        d: records,
+      });
+      return;
+    } catch (error: any) {
+      console.error("getLabDepartments error", error);
+      res.json({
+        status: 1,
+        message: error?.message || "Failed to load lab departments",
+        d: [],
+      });
+      return;
+    }
+  }
     async showTest(req: Request, res: Response): Promise<void> {
         const input = req.body || req.query;
         const OrderNo = input.Order_No || '';
@@ -704,3 +733,4 @@ export default class sampleCollectionController {
     }
 
 }
+
