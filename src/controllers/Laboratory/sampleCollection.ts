@@ -163,294 +163,91 @@ export default class sampleCollectionController {
         }
     }
 
-    async showData(req: Request, res: Response): Promise<void> {
-        const input = req.body || req.query;
-        const dtFm = input.Fromdate;
-        const dtTo = input.ToDate;
-        const SectionID = input.SectionID || '';
-        const Status = input.SampleStatus ? decodeURIComponent(input.SampleStatus) : '';
-        const Priority = input.Priority || '';
-        const SampleStatus = input.SampleStatus ? decodeURIComponent(input.SampleStatus) : '';
-        const Patient_type = input.Patient_type || '';
-        const Company_Id = input.Company_Id || '';
-        const CLNORGCODE = input.hospitalId || '';
+     async showData(req: Request, res: Response): Promise<void> {
+    const input = req.body || req.query;
 
-        let normalised = '';
-        if (SampleStatus) {
-            const rawParts = SampleStatus.replace(/'/g, '').split(',');
-            const cleanedParts: string[] = [];
-            for (const part of rawParts) {
-                const trimmed = part.trim();
-                if (trimmed && cleanedParts.indexOf(trimmed) === -1) {
-                    cleanedParts.push(trimmed);
-                }
-            }
+    const dtFm = input.Fromdate;
+    const dtTo = input.ToDate;
+    const SectionID = input.SectionID || "";
+    const Priority = input.Priority || "";
+    const Company_Id = input.Company_Id || "";
+    const CLNORGCODE = input.hospitalId || "";
+    const Patient_type = input.Patient_type || "All";
+    const SampleStatus = input.SampleStatus || "All";
 
-            if (cleanedParts.length > 0 && cleanedParts.every(s => s.toUpperCase() === 'A')) {
-                normalised = 'A';
-            } else if (cleanedParts.length > 0) {
-                normalised = cleanedParts.join(',');
-            }
+    try {
+      let sqlQuery = `
+      SELECT DISTINCT
+        om.ORDERNO,
+        CONVERT(VARCHAR(11), om.ORDERDATE, 106) AS ORDERDATE,
+        CONVERT(VARCHAR(8), om.ORDERTIME, 108) AS ORDERTIME,
+        om.MEDRECNO,
+        om.IPNO,
+        om.PATNAME,
+        ot.SAMPLESTATUS,
+        om.PRIORITY,
+        om.AGE,
+        dt.Firstname,
+        pm.Mobile
+      FROM DGL_ORDERMST om
+      INNER JOIN DGL_ORDERTRN ot ON om.ORDERNO = ot.ORDERNO
+      LEFT JOIN Patient_Master pm ON pm.PatientMr_No = om.MEDRECNO
+      LEFT JOIN Mst_DoctorMaster dt ON dt.Code = om.ORDEREDBY
+      INNER JOIN OPD_BILLMST ob ON ob.BILLNO = om.BILLNO
+      WHERE om.ORDERDATE >= @dtFm
+        AND om.ORDERDATE <= @dtTo
+        AND om.STATUS = 'A'
+        AND om.PRIORITY LIKE @Priority
+        AND om.ORDER_STATUS <> 'OR'
+        AND om.LABTYPECD = '01'
+        AND om.CLNORGCODE = @CLNORGCODE
+        AND ob.CRDCOMPCD LIKE @CompanyId
+    `;
+
+      const params: any = {
+        dtFm: `${dtFm} 00:00:00`,
+        dtTo: `${dtTo} 23:59:59`,
+        Priority:
+          Priority === "A" || Priority === "" || Priority === "All"
+            ? "%%"
+            : `%${Priority}%`,
+        CLNORGCODE,
+        CompanyId:
+          Company_Id === "" || Company_Id === "All" ? "%%" : `%${Company_Id}%`,
+      };
+
+      if (SectionID && SectionID !== "All") {
+        sqlQuery += ` AND ot.LABDPTCODE = @SectionID`;
+        params.SectionID = SectionID;
+      }
+
+      if (Patient_type && Patient_type !== "All") {
+        let mappedPatientType = Patient_type;
+
+        if (Patient_type === "OP") mappedPatientType = "O";
+        if (Patient_type === "IP") mappedPatientType = "I";
+        if (Patient_type === "D") mappedPatientType = "D";
+
+        sqlQuery += ` AND om.ORDERTYPE = @PatientType`;
+        params.PatientType = mappedPatientType;
+      }
+
+      if (SampleStatus && SampleStatus !== "All") {
+        if (SampleStatus === "Pending") {
+          sqlQuery += ` AND ot.SAMPLESTATUS IN ('OP')`;
+        } else if (SampleStatus === "Collected") {
+          sqlQuery += ` AND ot.SAMPLESTATUS IN ('SC', 'SA', 'C')`;
         }
+      }
 
-        let htmlRows = '';
-        let i = 0;
+      sqlQuery += ` ORDER BY om.ORDERNO DESC`;
 
-        try {
-            let sqlQuery = '';
-            const params: any = {};
-
-            if (Company_Id) {
-                if (SectionID) {
-                    sqlQuery += `select distinct om.ORDERNO,CONVERT(VARCHAR(11),om.ORDERDATE,106) ORDERDATE,CONVERT(VARCHAR(11),om.ORDERTIME,108) ORDERTIME, om.MEDRECNO, om.IPNO, om.PATNAME, ot.SAMPLESTATUS, om.PRIORITY,om.WARDNO,om.AGE,dt.Firstname,pm.Mobile from DGL_ORDERMST om inner join DGL_ORDERTRN ot on om.ORDERNO=ot.ORDERNO left join Patient_Master pm on pm.PatientMr_No=om.MEDRECNO left join Mst_DoctorMaster dt on dt.Code=om.ORDEREDBY inner join OPD_BILLMST OB on OB.BILLNO=OM.BILLNO where om.ORDERDATE>=@dtFm and om.ORDERDATE<=@dtTo and om.STATUS='A'`;
-
-                    params.dtFm = `${dtFm} 00:00:00`;
-                    params.dtTo = `${dtTo} 23:59:59`;
-
-                    let statusClause = '';
-                    if (!normalised || normalised === 'A') {
-                        statusClause = " AND ot.TESTSTATUS IN ('P','OP','SC','SA')";
-                    } else if (normalised.indexOf(',') !== -1) {
-                        const parts = normalised.split(',');
-                        const quoted = [];
-                        for (const p of parts) {
-                            quoted.push("'" + p.trim() + "'");
-                        }
-                        const cleanList = quoted.join(',');
-                        statusClause = " AND ot.TESTSTATUS IN (" + cleanList + ")";
-                    } else {
-                        statusClause = " AND ot.TESTSTATUS = @SampleStatus";
-                        params.SampleStatus = normalised.trim();
-                    }
-
-                    sqlQuery += statusClause;
-
-                    if (Patient_type !== 'A') {
-                        sqlQuery += ` AND om.PATTYPE = @PATTYPE`;
-                        params.PATTYPE = Patient_type;
-                    }
-
-                    sqlQuery += ` and om.PRIORITY like @Priority and om.ORDER_STATUS<>'OR' and ot.LABDPTCODE=@SectionID and om.LABTYPECD='01' and om.CLNORGCODE=@CLNORGCODE and om.ORDERTYPE='O' and OB.CRDCOMPCD like @CompanyId`;
-
-                    params.Priority = `%${Priority}%`;
-                    params.SectionID = SectionID;
-                    params.CLNORGCODE = CLNORGCODE;
-                    params.CompanyId = `%${Company_Id}%`;
-                }
-
-                else {
-                    sqlQuery += ` select distinct om.ORDERNO, CONVERT(VARCHAR(11),om.ORDERDATE,106) ORDERDATE, CONVERT(VARCHAR(11),om.ORDERTIME,108) ORDERTIME, om.MEDRECNO, om.IPNO, om.PATNAME, ot.SAMPLESTATUS, om.PRIORITY,om.WARDNO,om.AGE,dt.Firstname,pm.Mobile from DGL_ORDERMST om inner join DGL_ORDERTRN ot on om.ORDERNO=ot.ORDERNO left join Patient_Master pm on pm.PatientMr_No=om.MEDRECNO left join Mst_DoctorMaster dt on dt.Code=om.ORDEREDBY inner join OPD_BILLMST OB on OB.BILLNO=OM.BILLNO where om.ORDERDATE>=@dtFm  and om.ORDERDATE<=@dtTo and om.STATUS='A' `;
-
-                    params.dtFm = `${dtFm} 00:00:00`;
-                    params.dtTo = `${dtTo} 23:59:59`;
-
-                    let statusClause = '';
-                    if (!normalised || normalised === 'A') {
-                        statusClause = " AND ot.TESTSTATUS IN ('P','OP','SC','SA')";
-                    } else if (normalised.indexOf(',') !== -1) {
-                        const parts = normalised.split(',');
-                        const quoted = [];
-                        for (const p of parts) {
-                            quoted.push("'" + p.trim() + "'");
-                        }
-                        const cleanList = quoted.join(',');
-                        statusClause = " AND ot.TESTSTATUS IN (" + cleanList + ")";
-                    } else {
-                        statusClause = " AND ot.TESTSTATUS = @SampleStatus";
-                        params.SampleStatus = normalised.trim();
-                    }
-
-                    sqlQuery += statusClause;
-
-                    if (Patient_type !== 'A') {
-                        sqlQuery += ` AND om.PATTYPE = @PATTYPE`;
-                        params.PATTYPE = Patient_type;
-                    }
-
-                    sqlQuery += ` and om.PRIORITY like @Priority and om.ORDER_STATUS <>'OR' and om.LABTYPECD='01' and om.CLNORGCODE=@CLNORGCODE and om.ORDERTYPE='O' and OB.CRDCOMPCD like @CompanyId`;
-
-                    params.Priority = `%${Priority}%`;
-                    params.CLNORGCODE = CLNORGCODE;
-                    params.CompanyId = `%${Company_Id}%`;
-                }
-
-                sqlQuery += ` UNION ALL `;
-
-                if (SectionID) {
-                    sqlQuery += ` select distinct om.ORDERNO,CONVERT(VARCHAR(11),om.ORDERDATE,106) ORDERDATE,CONVERT(VARCHAR(11),om.ORDERTIME,108) ORDERTIME, om.MEDRECNO, om.IPNO, om.PATNAME, ot.SAMPLESTATUS, om.PRIORITY,om.WARDNO,om.AGE,dt.Firstname,pm.Mobile from DGL_ORDERMST om inner join DGL_ORDERTRN ot on om.ORDERNO=ot.ORDERNO left join Patient_Master pm on pm.PatientMr_No=om.MEDRECNO left join Mst_DoctorMaster dt on dt.Code=om.ORDEREDBY inner join IPD_ADMISSION IA on IA.IPNO=OM.IPNO where om.ORDERDATE>=@dtFmand om.ORDERDATE<=@dtTo and om.STATUS='A'`;
-
-                    let statusClause = '';
-                    if (!normalised || normalised === 'A') {
-                        statusClause = " AND ot.TESTSTATUS IN ('P','OP','SC','SA')";
-                    } else if (normalised.indexOf(',') !== -1) {
-                        const parts = normalised.split(',');
-                        const quoted = [];
-                        for (const p of parts) {
-                            quoted.push("'" + p.trim() + "'");
-                        }
-                        const cleanList = quoted.join(',');
-                        statusClause = " AND ot.TESTSTATUS IN (" + cleanList + ")";
-                    } else {
-                        statusClause = " AND ot.TESTSTATUS = @SampleStatus";
-                        params.SampleStatus = normalised.trim();
-                    }
-
-                    sqlQuery += statusClause;
-
-                    if (Patient_type !== 'A') {
-                        sqlQuery += ` AND om.PATTYPE=@PATTYPE`;
-                    }
-
-                    sqlQuery += ` and om.PRIORITY like @Priority and om.ORDER_STATUS<>'OR' and ot.LABDPTCODE=@SectionID and om.LABTYPECD='01' and om.CLNORGCODE=@CLNORGCODE and om.ORDERTYPE='I' and IA.CRDCOMPCD like @CompanyId`;
-
-                } else {
-                    sqlQuery += ` select distinct om.ORDERNO, CONVERT(VARCHAR(11),om.ORDERDATE,106) ORDERDATE, CONVERT(VARCHAR(11),om.ORDERTIME,108) ORDERTIME, om.MEDRECNO, om.IPNO, om.PATNAME, ot.SAMPLESTATUS, om.PRIORITY,om.WARDNO,om.AGE,dt.Firstname,pm.Mobile from DGL_ORDERMST om inner join DGL_ORDERTRN ot on om.ORDERNO=ot.ORDERNO left join Patient_Master pm on pm.PatientMr_No=om.MEDRECNO left join Mst_DoctorMaster dt on dt.Code=om.ORDEREDBY inner join IPD_ADMISSION IA on IA.IPNO=OM.IPNO where om.ORDERDATE>=@dtFm and om.ORDERDATE<=@dtTo and om.STATUS='A'`;
-
-                    let statusClause = '';
-                    if (!normalised || normalised === 'A') {
-                        statusClause = " AND ot.TESTSTATUS IN ('P','OP','SC','SA')";
-                    } else if (normalised.indexOf(',') !== -1) {
-                        const parts = normalised.split(',');
-                        const quoted = [];
-                        for (const p of parts) {
-                            quoted.push("'" + p.trim() + "'");
-                        }
-                        const cleanList = quoted.join(',');
-                        statusClause = " AND ot.TESTSTATUS IN (" + cleanList + ")";
-                    } else {
-                        statusClause = " AND ot.TESTSTATUS = @SampleStatus";
-                        params.SampleStatus = normalised.trim();
-                    }
-
-                    sqlQuery += statusClause;
-
-                    if (Patient_type !== 'A')
-                        sqlQuery += ` AND om.PATTYPE=@PATTYPE`;
-
-                    sqlQuery += ` and om.PRIORITY like @Priority and om.ORDER_STATUS <>'OR' and om.LABTYPECD='01' and om.CLNORGCODE=@CLNORGCODE and om.ORDERTYPE='I' and IA.CRDCOMPCD like @CompanyId`;
-                }
-
-                sqlQuery += ` ORDER BY om.MEDRECNO`;
-            }
-
-            else {
-                if (SectionID) {
-                    sqlQuery = `select distinct om.ORDERNO,CONVERT(VARCHAR(11),om.ORDERDATE,106) ORDERDATE,CONVERT(VARCHAR(11),om.ORDERTIME,108) ORDERTIME, om.MEDRECNO, om.IPNO, om.PATNAME,  ot.SAMPLESTATUS, om.PRIORITY,om.WARDNO,om.AGE,dt.Firstname,pm.Mobile  from DGL_ORDERMST om inner join DGL_ORDERTRN ot on om.ORDERNO=ot.ORDERNO  left join Patient_Master pm on pm.PatientMr_No=om.MEDRECNO  left join Mst_DoctorMaster dt on dt.Code=om.ORDEREDBY  where om.ORDERDATE>=@dtFm  and om.ORDERDATE<=@dtTo and om.STATUS='A' `;
-
-                    params.dtFm = `${dtFm} 00:00:00`;
-                    params.dtTo = `${dtTo} 23:59:59`;
-
-                    let statusClause = '';
-                    if (!normalised || normalised === 'A') {
-                        statusClause = " AND ot.TESTSTATUS IN ('P','OP','SC','SA')";
-                    } else if (normalised.indexOf(',') !== -1) {
-                        const parts = normalised.split(',');
-                        const quoted = [];
-                        for (const p of parts) {
-                            quoted.push("'" + p.trim() + "'");
-                        }
-                        const cleanList = quoted.join(',');
-                        statusClause = " AND ot.TESTSTATUS IN (" + cleanList + ")";
-                    } else {
-                        statusClause = " AND ot.TESTSTATUS = @SampleStatus";
-                        params.SampleStatus = normalised.trim();
-                    }
-
-                    sqlQuery += statusClause;
-
-                    if (Patient_type !== 'A') {
-                        sqlQuery += ` AND om.PATTYPE=@PATTYPE`;
-                        params.PATTYPE = Patient_type;
-                    }
-                    sqlQuery += ` and om.PRIORITY like @Priority and om.ORDER_STATUS<>'OR' and ot.LABDPTCODE=@SectionID and om.LABTYPECD='01' and om.CLNORGCODE=@CLNORGCODE order by om.MEDRECNO`;
-
-                    params.Priority = `%${Priority}%`;
-                    params.SectionID = SectionID;
-                    params.CLNORGCODE = CLNORGCODE;
-                } else {
-                    sqlQuery = `select distinct om.ORDERNO, CONVERT(VARCHAR(11),om.ORDERDATE,106) ORDERDATE, CONVERT(VARCHAR(11),om.ORDERTIME,108) ORDERTIME, om.MEDRECNO, om.IPNO, om.PATNAME, ot.SAMPLESTATUS, om.PRIORITY,om.WARDNO,om.AGE,dt.Firstname,pm.Mobile from DGL_ORDERMST om inner join DGL_ORDERTRN ot on om.ORDERNO=ot.ORDERNO left join Patient_Master pm on pm.PatientMr_No=om.MEDRECNO left join Mst_DoctorMaster dt on dt.Code=om.ORDEREDBY where om.ORDERDATE>=@dtFm  and om.ORDERDATE<=@dtTo and om.STATUS='A'`;
-
-                    params.dtFm = `${dtFm} 00:00:00`;
-                    params.dtTo = `${dtTo} 23:59:59`;
-
-                    let statusClause = '';
-                    if (!normalised || normalised === 'A') {
-                        statusClause = " AND ot.TESTSTATUS IN ('P','OP','SC','SA')";
-                    } else if (normalised.indexOf(',') !== -1) {
-                        const parts = normalised.split(',');
-                        const quoted = [];
-                        for (const p of parts) {
-                            quoted.push("'" + p.trim() + "'");
-                        }
-                        const cleanList = quoted.join(',');
-                        statusClause = " AND ot.TESTSTATUS IN (" + cleanList + ")";
-                    } else {
-                        statusClause = " AND ot.TESTSTATUS = @SampleStatus";
-                        params.SampleStatus = normalised.trim();
-                    }
-
-                    sqlQuery += statusClause;
-
-                    if (Patient_type !== 'A') {
-                        sqlQuery += ` AND om.PATTYPE=@PATTYPE`;
-                        params.PATTYPE = Patient_type;
-                    }
-                    sqlQuery += ` and om.PRIORITY like @Priority and om.ORDER_STATUS <>'OR' and om.LABTYPECD='01' and om.CLNORGCODE=@CLNORGCODE order by om.MEDRECNO`;
-
-                    params.Priority = `%${Priority}%`;
-                    params.CLNORGCODE = CLNORGCODE;
-                }
-            }
-
-
-            const { records } = await executeDbQuery(sqlQuery, params);
-
-
-            for (const row of records) {
-                i++;
-                if (i === 1) {
-                    htmlRows += `
-          <thead style='width:100%'>
-            <tr class='success'>
-              <th id='t1'>Order No</th>
-              <th id='t2'>Order Date</th>
-              <th id='t3'>Order Time</th>
-              <th id='t4'>Mr.Number</th>
-              <th id='t5'>Ip.Number</th>
-              <th id='t6'>Patient Name</th>
-              <th id='t7'>Age</th>
-              <th id='t8'>Mobile No</th>
-              <th id='t9'>Sample Status</th>
-              <th id='t10'>Doctor</th>
-              <th id='t11'>Ward</th>
-            </tr>
-          </thead>
-          <tbody>`;
-                }
-
-                htmlRows += `
-        <tr>
-          <td style='text-align:left;'>${row.ORDERNO ?? ''}</td>
-          <td style='text-align:left;'>${row.ORDERDATE ?? ''}</td>
-          <td style='text-align:left;'>${row.ORDERTIME ?? ''}</td>
-          <td style='text-align:left;'>${row.MEDRECNO ?? ''}</td>
-          <td style='text-align:left;'>${row.IPNO ?? ''}</td>
-          <td style='text-align:left;'>${row.PATNAME ?? ''}</td>
-          <td style='text-align:left;'>${row.AGE ?? ''}</td>
-          <td style='text-align:left;'>${row.Mobile ?? ''}</td>
-          <td style='text-align:left;'>${row.SAMPLESTATUS ?? ''}</td>
-          <td style='text-align:left;'>${row.Firstname ?? ''}</td>
-          <td style='text-align:left;'>${row.WARDNO ?? ''}</td>
-        </tr>`;
-            }
-
-            htmlRows += `</tbody>`;
-
-            res.json({ status: 0, d: htmlRows });
-        } catch (err: any) {
-            res.status(500).json({ status: 1, result: err.message });
-        }
+      const { records } = await executeDbQuery(sqlQuery, params);
+      res.json({ status: 0, d: records });
+    } catch (err: any) {
+      res.status(500).json({ status: 1, message: err.message });
     }
+  }
 
     async changeStatus(req: Request, res: Response): Promise<void> {
         const input = req.body;
